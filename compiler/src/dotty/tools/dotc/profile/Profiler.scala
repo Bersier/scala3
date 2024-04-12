@@ -234,10 +234,7 @@ private [profile] class RealProfiler(reporter : ProfileReporter)(using Context) 
     import java.lang.{Integer => jInt}
     val reportNs = System.nanoTime()
     val data = notification.getUserData
-    // val seq = notification.getSequenceNumber
-    // val message = notification.getMessage
     val tpe = notification.getType
-    // val time= notification.getTimeStamp
     data match {
       case cd: CompositeData if tpe == "com.sun.management.gc.notification" =>
         val name = cd.get("gcName").toString
@@ -318,8 +315,9 @@ private [profile] class RealProfiler(reporter : ProfileReporter)(using Context) 
     if chromeTrace == null
     then (TracedEventId.Empty, "")
     else
-      val completionName=  this.completionName(root, associatedFile)
-      val event = TracedEventId(associatedFile.name)
+      val file = associatedFile
+      val completionName=  this.completionName(root, file)
+      val event = TracedEventId(file.name)
       chromeTrace.traceDurationEventStart(Category.Completion.name, "↯", colour = "thread_state_sleeping")
       chromeTrace.traceDurationEventStart(Category.File.name, event)
       chromeTrace.traceDurationEventStart(Category.Completion.name, completionName)
