@@ -3657,9 +3657,9 @@ object Parsers {
         if paramOwner.isClass then
           mods |= PrivateLocal
         if isIdent(nme.raw.PLUS) && checkVarianceOK() then
-          mods |= Covariant
+          mods |= CovariantFlagSet
         else if isIdent(nme.raw.MINUS) && checkVarianceOK() then
-          mods |= Contravariant
+          mods |= ContravariantFlagSet
         atSpan(start, nameStart) {
           val name =
             if paramOwner.acceptsWildcard && in.token == USCORE then

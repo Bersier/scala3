@@ -67,9 +67,9 @@ object DesugarEnums {
     val tparams = enumClass.typeParams
     def isGround(tp: Type) = tp.subst(tparams, tparams.map(_ => NoType)) eq tp
     val targs = tparams map { tparam =>
-      if (tparam.is(Covariant) && isGround(tparam.info.bounds.lo))
+      if (tparam.is(CovariantFlagSet) && isGround(tparam.info.bounds.lo))
         tparam.info.bounds.lo
-      else if (tparam.is(Contravariant) && isGround(tparam.info.bounds.hi))
+      else if (tparam.is(ContravariantFlagSet) && isGround(tparam.info.bounds.hi))
         tparam.info.bounds.hi
       else {
         def problem =

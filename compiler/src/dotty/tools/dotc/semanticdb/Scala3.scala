@@ -329,9 +329,9 @@ object Scala3:
           (sym.is(CaseClass) && !symkinds.exists(_.isTypeVal)) || // `t` of `case List[t] =>` (which has `CaseClass` flag) shouldn't be `CASE`
           sym.isAllOf(EnumCase) then
           props |= SymbolInformation.Property.CASE.value
-        if sym.is(Covariant) then
+        if sym.is(CovariantFlagSet) then
           props |= SymbolInformation.Property.COVARIANT.value
-        if sym.is(Contravariant) then
+        if sym.is(ContravariantFlagSet) then
           props |= SymbolInformation.Property.CONTRAVARIANT.value
         if sym.isAllOf(DefaultMethod | JavaDefined) || sym.is(Accessor) && sym.name.is(NameKinds.DefaultGetterName) then
           props |= SymbolInformation.Property.DEFAULT.value

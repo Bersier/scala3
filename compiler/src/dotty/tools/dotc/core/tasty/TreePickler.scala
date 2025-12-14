@@ -169,8 +169,8 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
     case tp: HKTypeLambda if tp.isDeclaredVarianceLambda =>
       for v <- tp.declaredVariances do
         writeByte(
-          if v.is(Covariant) then COVARIANT
-          else if v.is(Contravariant) then CONTRAVARIANT
+          if v.is(CovariantFlagSet) then COVARIANT
+          else if v.is(ContravariantFlagSet) then CONTRAVARIANT
           else STABLE)
     case _ =>
 
@@ -906,8 +906,8 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
       if flags.is(Sealed) then writeModTag(SEALED)
       if flags.is(Abstract) then writeModTag(ABSTRACT)
       if flags.is(Trait) then writeModTag(TRAIT)
-      if flags.is(Covariant) then writeModTag(COVARIANT)
-      if flags.is(Contravariant) then writeModTag(CONTRAVARIANT)
+      if flags.is(CovariantFlagSet) then writeModTag(COVARIANT)
+      if flags.is(ContravariantFlagSet) then writeModTag(CONTRAVARIANT)
       if flags.is(Opaque) then writeModTag(OPAQUE)
       if flags.is(Open) then writeModTag(OPEN)
       if flags.is(Into) then writeModTag(INTO)

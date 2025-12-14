@@ -20,7 +20,7 @@ import scala.compiletime.uninitialized
  *  The method should be invoked once for each Template.
  */
 object VarianceChecker {
-  case class VarianceError(tvar: Symbol, required: Variance)
+  case class VarianceError(tvar: Symbol, required: VarianceFlagSet)
   def check(tree: tpd.Tree)(using Context): Unit =
     VarianceChecker().Traverser.traverse(tree)
 
@@ -75,15 +75,15 @@ class VarianceChecker(using Context) {
      *  The search proceeds from `base` to the owner of `tvar`.
      *  Initially the state is covariant, but it might change along the search.
      */
-    def relativeVariance(tvar: Symbol, base: Symbol, v: Variance = Covariant): Variance = /*trace(i"relative variance of $tvar wrt $base, so far: $v")*/
+    def relativeVariance(tvar: Symbol, base: Symbol, v: VarianceFlagSet = CovariantFlagSet): VarianceFlagSet = /*trace(i"relative variance of $tvar wrt $base, so far: $v")*/
       if base == tvar.owner then
         v
       else if base.is(Param) && base.owner.isTerm && !base.owner.isAllOf(PrivateLocal) then
         relativeVariance(tvar, paramOuter(base.owner), flip(v))
       else if base.owner.isTerm || base.owner.is(Package) || base.isAllOf(PrivateLocal) then
-        Bivariant
+        BivariantFlagSet
       else if base.isAliasType then
-        relativeVariance(tvar, base.owner, Invariant)
+        relativeVariance(tvar, base.owner, InvariantFlagSet)
       else
         relativeVariance(tvar, base.owner, v)
 
@@ -102,9 +102,9 @@ class VarianceChecker(using Context) {
     /** Check variance of abstract type `tvar` when referred from `base`. */
     private def checkVarianceOfSymbol(tvar: Symbol): Option[VarianceError] = {
       val relative = relativeVariance(tvar, base)
-      if (relative == Bivariant) None
+      if (relative == BivariantFlagSet) None
       else {
-        val required = if variance == 1 then relative else if variance == -1 then flip(relative) else Invariant
+        val required = if variance == 1 then relative else if variance == -1 then flip(relative) else InvariantFlagSet
         def tvar_s = s"$tvar (${varianceLabel(tvar.flags)} ${tvar.showLocated})"
         def base_s = s"$base in ${base.owner}" + (if (base.owner.isClass) "" else " in " + base.owner.enclosingClass)
         report.log(s"verifying $tvar_s is ${varianceLabel(required)} at $base_s")

@@ -3217,8 +3217,8 @@ class QuotesImpl private (using val ctx: Context) extends Quotes, QuoteUnpickler
       def Artifact: Flags = dotc.core.Flags.Artifact
       def Case: Flags = dotc.core.Flags.Case
       def CaseAccessor: Flags = dotc.core.Flags.CaseAccessor
-      def Contravariant: Flags = dotc.core.Flags.Contravariant
-      def Covariant: Flags = dotc.core.Flags.Covariant
+      def Contravariant: Flags = dotc.core.Flags.ContravariantFlagSet
+      def Covariant: Flags = dotc.core.Flags.CovariantFlagSet
       def Deferred: Flags = dotc.core.Flags.Deferred
       def EmptyFlags = dotc.core.Flags.EmptyFlags
       def Enum: Flags = dotc.core.Flags.Enum

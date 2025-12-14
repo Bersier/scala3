@@ -14,7 +14,7 @@ import Decorators.*
 import ast.*
 import ast.Trees.{LambdaTypeTree, TypeBoundsTree}
 import Trees.Literal
-import Variances.Variance
+import Variances.VarianceFlagSet
 import annotation.tailrec
 import util.SimpleIdentityMap
 import util.Stats
@@ -1629,9 +1629,9 @@ object SymDenotations {
     /** The variance of this type parameter or type member as a subset of
      *  {Covariant, Contravariant}
      */
-    final def variance(using Context): Variance =
-      if is(Covariant) then Covariant
-      else if is(Contravariant) then Contravariant
+    final def variance(using Context): VarianceFlagSet =
+      if is(CovariantFlagSet) then CovariantFlagSet
+      else if is(ContravariantFlagSet) then ContravariantFlagSet
       else EmptyFlags
 
     /** The flags to be used for a type parameter owned by this symbol.

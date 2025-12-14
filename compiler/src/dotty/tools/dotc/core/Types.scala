@@ -18,7 +18,7 @@ import Decorators.*
 import Denotations.*
 import Periods.*
 import CheckRealizable.*
-import Variances.{Variance, setStructuralVariances, Invariant}
+import Variances.{VarianceFlagSet, setStructuralVariances, InvariantFlagSet}
 import typer.Nullables
 import util.Stats.*
 import util.{SimpleIdentityMap, SimpleIdentitySet}
@@ -4459,7 +4459,7 @@ object Types extends TypeUtils {
    *
    *  Variances are stored in the `typeParams` list of the lambda.
    */
-  class HKTypeLambda(val paramNames: List[TypeName], @constructorOnly variances: List[Variance])(
+  class HKTypeLambda(val paramNames: List[TypeName], @constructorOnly variances: List[VarianceFlagSet])(
       paramInfosExp: HKTypeLambda => List[TypeBounds], resultTypeExp: HKTypeLambda => Type)
   extends HKLambda with TypeLambda {
     type This = HKTypeLambda
@@ -4468,7 +4468,7 @@ object Types extends TypeUtils {
     val paramInfos: List[TypeBounds] = paramInfosExp(this: @unchecked)
     val resType: Type = resultTypeExp(this: @unchecked)
 
-    private def setVariances(tparams: List[LambdaParam], vs: List[Variance]): Unit =
+    private def setVariances(tparams: List[LambdaParam], vs: List[VarianceFlagSet]): Unit =
       if tparams.nonEmpty then
         tparams.head.declaredVariance = vs.head
         setVariances(tparams.tail, vs.tail)
@@ -4506,12 +4506,12 @@ object Types extends TypeUtils {
     override def newLikeThis(paramNames: List[ThisName], paramInfos: List[PInfo], resType: Type)(using Context): This =
       newLikeThis(paramNames, declaredVariances, paramInfos, resType)
 
-    def newLikeThis(paramNames: List[ThisName], variances: List[Variance], paramInfos: List[PInfo], resType: Type)(using Context): This =
+    def newLikeThis(paramNames: List[ThisName], variances: List[VarianceFlagSet], paramInfos: List[PInfo], resType: Type)(using Context): This =
       HKTypeLambda(paramNames, variances)(
           x => paramInfos.mapConserve(_.subst(this, x).asInstanceOf[PInfo]),
           x => resType.subst(this, x))
 
-    def withVariances(variances: List[Variance])(using Context): This =
+    def withVariances(variances: List[VarianceFlagSet])(using Context): This =
       newLikeThis(paramNames, variances, paramInfos, resType)
 
     protected def prefixString: String = "HKTypeLambda"
@@ -4570,7 +4570,7 @@ object Types extends TypeUtils {
         resultTypeExp: HKTypeLambda => Type)(using Context): HKTypeLambda =
       apply(paramNames, Nil)(paramInfosExp, resultTypeExp)
 
-    def apply(paramNames: List[TypeName], variances: List[Variance])(
+    def apply(paramNames: List[TypeName], variances: List[VarianceFlagSet])(
         paramInfosExp: HKTypeLambda => List[TypeBounds],
         resultTypeExp: HKTypeLambda => Type)(using Context): HKTypeLambda =
       unique(new HKTypeLambda(paramNames, variances)(paramInfosExp, resultTypeExp))
@@ -4676,17 +4676,17 @@ object Types extends TypeUtils {
     private var myVariance: FlagSet = UndefinedFlags
 
     /** Low level setter, only called from Variances.setStructuralVariances */
-    def storedVariance_= (v: Variance): Unit =
+    def storedVariance_= (v: VarianceFlagSet): Unit =
       myVariance = v
 
     /** Low level getter, only called from Variances.setStructuralVariances */
-    def storedVariance: Variance =
+    def storedVariance: VarianceFlagSet =
       myVariance
 
     /** Set the declared variance of this parameter.
      *  @pre the containing lambda is a isDeclaredVarianceLambda
      */
-    def declaredVariance_=(v: Variance): Unit =
+    def declaredVariance_=(v: VarianceFlagSet): Unit =
       assert(tl.isDeclaredVarianceLambda)
       assert(myVariance == UndefinedFlags)
       myVariance = v
@@ -4694,19 +4694,19 @@ object Types extends TypeUtils {
     /** The declared variance of this parameter.
      *  @pre the containing lambda is a isDeclaredVarianceLambda
      */
-    def declaredVariance: Variance =
+    def declaredVariance: VarianceFlagSet =
       assert(tl.isDeclaredVarianceLambda)
       assert(myVariance != UndefinedFlags)
       myVariance
 
     /** The declared or structural variance of this parameter. */
-    def paramVariance(using Context): Variance =
+    def paramVariance(using Context): VarianceFlagSet =
       if myVariance == UndefinedFlags then
         tl match
           case tl: HKTypeLambda =>
             setStructuralVariances(tl)
           case _ =>
-            myVariance = Invariant
+            myVariance = InvariantFlagSet
       myVariance
 
     def toText(printer: Printer): Text = printer.toText(this)

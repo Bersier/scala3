@@ -21,7 +21,7 @@ import Annotations.*
 import NameKinds.*
 import NamerOps.*
 import ContextOps.*
-import Variances.Invariant
+import Variances.InvariantFlagSet
 import TastyUnpickler.NameTable
 import typer.ConstFold
 import typer.Checking.checkNonCyclic
@@ -376,9 +376,9 @@ class TreeUnpickler(reader: TastyReader,
           case tp: HKTypeLambda if currentAddr != end =>
             val vs = until(end) {
               readByte() match
-                case STABLE => Invariant
-                case COVARIANT => Covariant
-                case CONTRAVARIANT => Contravariant
+                case STABLE => InvariantFlagSet
+                case COVARIANT => CovariantFlagSet
+                case CONTRAVARIANT => ContravariantFlagSet
             }
             tp.withVariances(vs)
           case _ => tp
@@ -746,8 +746,8 @@ class TreeUnpickler(reader: TastyReader,
           case MUTABLE => addFlag(Mutable)
           case FIELDaccessor => addFlag(Accessor)
           case CASEaccessor => addFlag(CaseAccessor)
-          case COVARIANT => addFlag(Covariant)
-          case CONTRAVARIANT => addFlag(Contravariant)
+          case COVARIANT => addFlag(CovariantFlagSet)
+          case CONTRAVARIANT => addFlag(ContravariantFlagSet)
           case HASDEFAULT => addFlag(HasDefault)
           case STABLE => addFlag(StableRealizable)
           case EXTENSION => addFlag(Extension)

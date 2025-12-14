@@ -7,29 +7,62 @@ import Decorators.*
 
 object Variances {
 
-  type Variance = FlagSet
-  val Bivariant: Variance = VarianceFlags
-  val Invariant: Variance = EmptyFlags
+  object Vs:
+    opaque type Variance = Int
 
-  def varianceFromInt(v: Int): Variance =
-    if v < 0 then Contravariant
-    else if v > 0 then Covariant
-    else Invariant
+    val invariant = 0
+    val covariant = 1
+    val contravariant = 2
+    val bivariant = 3
 
-  def varianceToInt(v: Variance): Int =
-    if v.is(Covariant) then 1
-    else if v.is(Contravariant) then -1
+    def fromFlagSet(flagSet: VarianceFlagSet): Variance =
+      if flagSet.is(CovariantFlagSet) then
+        if flagSet.is(ContravariantFlagSet)
+        then bivariant
+        else covariant
+      else if flagSet.is(ContravariantFlagSet)
+        then contravariant
+        else invariant
+
+    private final val flipLookupTable = 0xD8
+    private final val timesLookupTable = 0xFFD8E4C0
+
+    extension (v: Variance)
+      inline def invert: Variance = v ^ 3
+      inline def flip: Variance = (flipLookupTable >>> (v << 1)) & 3
+      inline def *(w: Variance): Variance =
+        (timesLookupTable >>> ((v << 3) | (w << 1))) & 3
+      def toFlagSet: VarianceFlagSet = v match
+        case 0 => InvariantFlagSet
+        case 1 => CovariantFlagSet
+        case 2 => ContravariantFlagSet
+        case 3 => BivariantFlagSet
+        case _ => throw AssertionError(s"Impossible variance: $v")
+  end Vs
+
+  type VarianceFlagSet = FlagSet
+  val BivariantFlagSet: VarianceFlagSet = VarianceFlags
+  val InvariantFlagSet: VarianceFlagSet = EmptyFlags
+
+  def varianceFromInt(v: Int): VarianceFlagSet =
+    if v < 0 then ContravariantFlagSet
+    else if v > 0 then CovariantFlagSet
+    else InvariantFlagSet
+
+  def varianceToInt(v: VarianceFlagSet): Int =
+    if v.is(CovariantFlagSet) then 1
+    else if v.is(ContravariantFlagSet) then -1
     else 0
 
   /** Flip between covariant and contravariant */
-  def flip(v: Variance): Variance =
-    if (v == Covariant) Contravariant
-    else if (v == Contravariant) Covariant
+  def flip(v: VarianceFlagSet): VarianceFlagSet =
+    if (v == CovariantFlagSet) ContravariantFlagSet
+    else if (v == ContravariantFlagSet) CovariantFlagSet
     else v
 
   def setStructuralVariances(lam: HKTypeLambda)(using Context): Unit =
     assert(!lam.isDeclaredVarianceLambda)
-    for param <- lam.typeParams do param.storedVariance = Bivariant
+    for param <- lam.typeParams do param.storedVariance = BivariantFlagSet
     object narrowVariances extends TypeTraverser {
       def traverse(t: Type): Unit = t match
         case t: TypeParamRef if t.binder eq lam =>
@@ -65,8 +98,8 @@ object Variances {
     if needsDetailedCheck then tparams1.corresponds(tparams2)(varianceConforms)
     else tparams1.hasSameLengthAs(tparams2)
 
-  def varianceSign(v: Variance): String = varianceSign(varianceToInt(v))
-  def varianceLabel(v: Variance): String = varianceLabel(varianceToInt(v))
+  def varianceSign(v: VarianceFlagSet): String = varianceSign(varianceToInt(v))
+  def varianceLabel(v: VarianceFlagSet): String = varianceLabel(varianceToInt(v))
 
   def varianceSign(v: Int): String =
     if (v > 0) "+"
@@ -78,5 +111,5 @@ object Variances {
     else if v > 0 then "covariant"
     else "invariant"
 
-  val alwaysInvariant: Any => Invariant.type = Function.const(Invariant)
+  val alwaysInvariant: Any => InvariantFlagSet.type = Function.const(InvariantFlagSet)
 }

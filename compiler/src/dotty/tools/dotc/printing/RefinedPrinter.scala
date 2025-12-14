@@ -425,8 +425,8 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
     }
 
     def varianceText(mods: untpd.Modifiers) =
-      if (mods.is(Covariant)) "+"
-      else if (mods.is(Contravariant)) "-"
+      if (mods.is(CovariantFlagSet)) "+"
+      else if (mods.is(ContravariantFlagSet)) "-"
       else ""
 
     def argText(arg: Tree): Text = arg match {

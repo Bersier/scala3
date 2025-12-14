@@ -174,7 +174,7 @@ object Mutability:
         aargs match
           case aargs @ (aarg :: aargs1) =>
             val aarg1 =
-              if formals.head.paramVariance.is(Covariant)
+              if formals.head.paramVariance.is(CovariantFlagSet)
               then adaptReadOnlyToExpected(aarg, eargs.head)
               else aarg
             aargs.derivedCons(aarg1, improveArgs(aargs1, eargs.tail, formals.tail))

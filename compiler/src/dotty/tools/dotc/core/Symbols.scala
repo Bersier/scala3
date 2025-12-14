@@ -21,7 +21,7 @@ import NameOps.*
 import NameKinds.LazyImplicitName
 import ast.*, tpd.*
 import Constants.Constant
-import Variances.Variance
+import Variances.VarianceFlagSet
 import reporting.Message
 import collection.mutable
 import io.AbstractFile
@@ -401,7 +401,7 @@ object Symbols extends SymUtils {
     def paramInfo(using Context): Type = denot.info
     def paramInfoAsSeenFrom(pre: Type)(using Context): Type = pre.memberInfo(this)
     def paramInfoOrCompleter(using Context): Type = denot.infoOrCompleter
-    def paramVariance(using Context): Variance = denot.variance
+    def paramVariance(using Context): VarianceFlagSet = denot.variance
     def paramRef(using Context): TypeRef = denot.typeRef
 
     /** Copy a symbol, overriding selective fields.

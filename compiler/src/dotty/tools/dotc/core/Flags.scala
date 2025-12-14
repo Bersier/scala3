@@ -274,10 +274,10 @@ object Flags {
   val (Inline @ _, _, _) = newFlags(19, "inline")
 
   /** An outer accessor / a covariant type variable */
-  val (OuterOrCovariant @ _, OuterAccessor @ _, Covariant @ _) = newFlags(20, "<outer accessor>", "<covariant>")
+  val (OuterOrCovariant @ _, OuterAccessor @ _, CovariantFlagSet @ _) = newFlags(20, "<outer accessor>", "<covariant>")
 
   /** The label of a labeled block / a contravariant type variable */
-  val (LabelOrContravariant @ _, Label @ _, Contravariant @ _) = newFlags(21, "<label>", "<contravariant>")
+  val (LabelOrContravariant @ _, Label @ _, ContravariantFlagSet @ _) = newFlags(21, "<label>", "<contravariant>")
 
   /** Labeled with of abstract & override
    *    /
@@ -490,7 +490,7 @@ object Flags {
   val UnstableValueFlags: FlagSet = Mutable | Method
 
   /** Flags that express the variance of a type parameter. */
-  val VarianceFlags: FlagSet = Covariant | Contravariant
+  val VarianceFlags: FlagSet = CovariantFlagSet | ContravariantFlagSet
 
 // ----- Creation flag sets ----------------------------------
 
@@ -567,8 +567,8 @@ object Flags {
   val JavaOrPrivateOrSynthetic: FlagSet      = Artifact | JavaDefined | Private | Synthetic
   val PrivateOrSynthetic: FlagSet            = Artifact | Private | Synthetic
   val EnumCase: FlagSet                      = Case | Enum
-  val CovariantLocal: FlagSet                = Covariant | Local                              // A covariant type parameter
-  val ContravariantLocal: FlagSet            = Contravariant | Local                          // A contravariant type parameter
+  val CovariantLocal: FlagSet                = CovariantFlagSet | Local                              // A covariant type parameter
+  val ContravariantLocal: FlagSet            = ContravariantFlagSet | Local                          // A contravariant type parameter
   val ConstructorProxyModule: FlagSet        = PhantomSymbol | Module
   val CaptureParam: FlagSet                  = PhantomSymbol | StableRealizable | Synthetic
   val DefaultParameter: FlagSet              = HasDefault | Param                             // A Scala 2x default parameter

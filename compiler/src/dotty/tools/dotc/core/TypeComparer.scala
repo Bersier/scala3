@@ -15,7 +15,7 @@ import config.Printers.{subtyping, gadts, matchTypes, capt, noPrinter}
 import config.SourceVersion
 import TypeErasure.{erasedLub, erasedGlb}
 import TypeApplications.*
-import Variances.{Variance, variancesConform}
+import Variances.{VarianceFlagSet, variancesConform}
 import Constants.Constant
 import scala.util.control.NonFatal
 import typer.ProtoTypes.constrained
@@ -2764,7 +2764,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
    *    [X1, ..., Xn] -> op(tp1[X1, ..., Xn], tp2[X1, ..., Xn])
    */
   def liftIfHK(tp1: Type, tp2: Type,
-      op: (Type, Type) => Type, original: (Type, Type) => Type, combineVariance: (Variance, Variance) => Variance) = {
+      op: (Type, Type) => Type, original: (Type, Type) => Type, combineVariance: (VarianceFlagSet, VarianceFlagSet) => VarianceFlagSet) = {
     val tparams1 = tp1.typeParams
     val tparams2 = tp2.typeParams
     def applied(tp: Type) = tp.appliedTo(tp.typeParams.map(_.paramInfoAsSeenFrom(tp)))
@@ -3503,7 +3503,7 @@ object TypeComparer {
 
   def liftIfHK(tp1: Type, tp2: Type,
       op: (Type, Type) => Type, original: (Type, Type) => Type,
-      combineVariance: (Variance, Variance) => Variance)(using Context): Type =
+      combineVariance: (VarianceFlagSet, VarianceFlagSet) => VarianceFlagSet)(using Context): Type =
     comparing(_.liftIfHK(tp1, tp2, op, original, combineVariance))
 
   def constValue(tp: Type)(using Context): Option[Constant] =

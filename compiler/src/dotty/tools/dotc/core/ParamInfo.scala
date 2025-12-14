@@ -3,7 +3,7 @@ package dotty.tools.dotc.core
 import Names.Name
 import Contexts.*
 import Types.Type
-import Variances.{Variance, varianceToInt}
+import Variances.{VarianceFlagSet, varianceToInt}
 
 /** A common super trait of Symbol and LambdaParam.
  *  Used to capture the attributes of type parameters which can be implemented as either.
@@ -36,7 +36,7 @@ trait ParamInfo {
   def paramInfoOrCompleter(using Context): Type
 
   /** The variance of the type parameter */
-  def paramVariance(using Context): Variance
+  def paramVariance(using Context): VarianceFlagSet
 
   /** The variance of the type parameter, as a number -1, 0, +1.
    *  Bivariant is mapped to 1, i.e. it is treated like Covariant.

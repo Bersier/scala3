@@ -116,11 +116,11 @@ class Definitions {
         val arity = name.functionArity
         if impure then
           val argParamNames = List.tabulate(arity)(tpnme.syntheticTypeParamName)
-          val argVariances = List.fill(arity)(Contravariant)
+          val argVariances = List.fill(arity)(ContravariantFlagSet)
           val underlyingName = name.asSimpleName.drop(6)
           val underlyingClass = ScalaPackageVal.requiredClass(underlyingName)
           denot.info = TypeAlias(
-            HKTypeLambda(argParamNames :+ "R".toTypeName, argVariances :+ Covariant)(
+            HKTypeLambda(argParamNames :+ "R".toTypeName, argVariances :+ CovariantFlagSet)(
               tl => List.fill(arity + 1)(TypeBounds.empty),
               tl => RetainingType(underlyingClass.typeRef.appliedTo(tl.paramRefs),
                       captureRoot.termRef)
@@ -130,9 +130,9 @@ class Definitions {
           val decls = newScope
           val paramNamePrefix = tpnme.scala ++ str.NAME_JOIN ++ name ++ str.EXPAND_SEPARATOR
           val argParamRefs = List.tabulate(arity) { i =>
-            enterTypeParam(cls, paramNamePrefix ++ "T" ++ (i + 1).toString, Contravariant, decls).typeRef
+            enterTypeParam(cls, paramNamePrefix ++ "T" ++ (i + 1).toString, ContravariantFlagSet, decls).typeRef
           }
-          val resParamRef = enterTypeParam(cls, paramNamePrefix ++ "R", Covariant, decls).typeRef
+          val resParamRef = enterTypeParam(cls, paramNamePrefix ++ "R", CovariantFlagSet, decls).typeRef
           val methodType = MethodType.companion(
             isContextual = name.isContextFunction,
             isImplicit = false)
@@ -656,9 +656,9 @@ class Definitions {
   @tu lazy val BoxedDoubleModule : TermSymbol = requiredModule("java.lang.Double")
   @tu lazy val BoxedUnitModule   : TermSymbol = requiredModule("java.lang.Void")
 
-  @tu lazy val ByNameParamClass2x: ClassSymbol = enterSpecialPolyClass(tpnme.BYNAME_PARAM_CLASS, Covariant, Seq(AnyType))
+  @tu lazy val ByNameParamClass2x: ClassSymbol = enterSpecialPolyClass(tpnme.BYNAME_PARAM_CLASS, CovariantFlagSet, Seq(AnyType))
 
-  @tu lazy val RepeatedParamClass: ClassSymbol = enterSpecialPolyClass(tpnme.REPEATED_PARAM_CLASS, Covariant, Seq(ObjectType, SeqType))
+  @tu lazy val RepeatedParamClass: ClassSymbol = enterSpecialPolyClass(tpnme.REPEATED_PARAM_CLASS, CovariantFlagSet, Seq(ObjectType, SeqType))
 
   // fundamental classes
   @tu lazy val StringClass: ClassSymbol = requiredClass("java.lang.String")
