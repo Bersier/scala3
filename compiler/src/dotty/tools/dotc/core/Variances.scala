@@ -10,19 +10,19 @@ object Variances {
   object Vs:
     opaque type Variance = Int
 
-    val invariant = 0
-    val covariant = 1
-    val contravariant = 2
-    val bivariant = 3
+    val Invariant: Variance = 0
+    val Covariant: Variance = 1
+    val Contravariant: Variance = 2
+    val Bivariant: Variance = 3
 
     def fromFlagSet(flagSet: VarianceFlagSet): Variance =
       if flagSet.is(CovariantFlagSet) then
         if flagSet.is(ContravariantFlagSet)
-        then bivariant
-        else covariant
+        then Bivariant
+        else Covariant
       else if flagSet.is(ContravariantFlagSet)
-        then contravariant
-        else invariant
+        then Contravariant
+        else Invariant
 
     private final val flipLookupTable = 0xD8
     private final val timesLookupTable = 0xFFD8E4C0
@@ -33,10 +33,10 @@ object Variances {
       inline def *(w: Variance): Variance =
         (timesLookupTable >>> ((v << 3) | (w << 1))) & 3
       def toFlagSet: VarianceFlagSet = v match
-        case 0 => InvariantFlagSet
-        case 1 => CovariantFlagSet
-        case 2 => ContravariantFlagSet
-        case 3 => BivariantFlagSet
+        case Invariant => InvariantFlagSet
+        case Covariant => CovariantFlagSet
+        case Contravariant => ContravariantFlagSet
+        case Bivariant => BivariantFlagSet
         case _ => throw AssertionError(s"Impossible variance: $v")
   end Vs
 
