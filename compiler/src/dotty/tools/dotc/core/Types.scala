@@ -5,7 +5,8 @@ package core
 import Symbols.*
 import Flags.*
 import Names.*
-import StdNames.*, NameOps.*
+import StdNames.*
+import NameOps.*
 import NullOpsDecorator.*
 import NameKinds.{SkolemName, WildcardParamName}
 import Scopes.*
@@ -18,7 +19,7 @@ import Decorators.*
 import Denotations.*
 import Periods.*
 import CheckRealizable.*
-import Variances.{VarianceFlagSet, setStructuralVariances, InvariantFlagSet}
+import Variances.{InvariantFlagSet, VarianceFlagSet, Vs, setStructuralVariances}
 import typer.Nullables
 import util.Stats.*
 import util.{SimpleIdentityMap, SimpleIdentitySet}
@@ -28,14 +29,17 @@ import printing.Texts.*
 import printing.Printer
 import Hashable.*
 import Uniques.*
+
 import collection.mutable
 import config.Config
 import config.Feature.sourceVersion
 import config.SourceVersion
-import annotation.{tailrec, constructorOnly}
-import scala.util.hashing.{ MurmurHash3 => hashing }
-import config.Printers.{core, typr, matchTypes}
-import reporting.{trace, Message}
+
+import annotation.{constructorOnly, tailrec}
+import scala.util.hashing.MurmurHash3 as hashing
+import config.Printers.{core, matchTypes, typr}
+import reporting.{Message, trace}
+
 import java.lang.ref.WeakReference
 import compiletime.uninitialized
 import ContextOps.isRechecking
@@ -2597,7 +2601,7 @@ object Types extends TypeUtils {
       if (0 <= idx && idx < args.length) {
         val argInfo = args(idx) match {
           case arg: TypeBounds =>
-            val v = param.paramVarianceSign
+            val v = param.oldParamVarianceSign
             val pbounds = param.paramInfo
             if (v > 0 && pbounds.loBound.dealiasKeepAnnots.isExactlyNothing) TypeAlias(arg.hiBound & rebase(pbounds.hiBound))
             else if (v < 0 && pbounds.hiBound.dealiasKeepAnnots.isExactlyAny) TypeAlias(arg.loBound | rebase(pbounds.loBound))
@@ -2807,7 +2811,7 @@ object Types extends TypeUtils {
         case base: AndOrType =>
           var tp1 = argForParam(base.tp1)
           var tp2 = argForParam(base.tp2)
-          val variance = tparam.paramVarianceSign
+          val variance = tparam.oldParamVarianceSign
           if (isBounds(tp1) || isBounds(tp2) || variance == 0) {
             // compute argument as a type bounds instead of a point type
             tp1 = tp1.bounds
@@ -5499,7 +5503,7 @@ object Types extends TypeUtils {
               else
                 recArgPatterns(pat) { argPatterns =>
                   val needsConcreteScrut = argPatterns.zip(tycon.typeParams).exists {
-                    (argPattern, tparam) => tparam.paramVarianceSign != 0 && argPattern.needsConcreteScrutInVariantPos
+                    (argPattern, tparam) => tparam.oldParamVarianceSign != 0 && argPattern.needsConcreteScrutInVariantPos
                   }
                   MatchTypeCasePattern.BaseTypeTest(tycon, argPatterns, needsConcreteScrut)
                 }
@@ -5566,7 +5570,7 @@ object Types extends TypeUtils {
         val AppliedType(tycon, args) = pat
         val tparams = tycon.typeParams
         val argPatterns = args.zip(tparams).map { (arg, tparam) =>
-          rec(arg, tparam.paramVarianceSign)
+          rec(arg, tparam.oldParamVarianceSign)
         }
         argPatterns.find(_.isInstanceOf[MatchTypeCaseError]).getOrElse:
           val argPatterns1 = argPatterns.asInstanceOf[List[MatchTypeCasePattern]] // they are not errors
@@ -5983,6 +5987,11 @@ object Types extends TypeUtils {
     override def computeHash(bs: Binders): Int = hashSeed
   }
 
+  /** Bivariant type argument placeholder */
+  @sharable case object BivariantAnyType extends CachedGroundType {
+    override def computeHash(bs: Binders): Int = hashSeed
+  }
+
   /** Missing prefix */
   @sharable case object NoPrefix extends CachedGroundType {
     override def computeHash(bs: Binders): Int = hashSeed
@@ -6341,7 +6350,7 @@ object Types extends TypeUtils {
 
     protected def mapArg(arg: Type, tparam: ParamInfo): Type = arg match
       case arg: TypeBounds => this(arg)
-      case arg => atVariance(variance * tparam.paramVarianceSign)(this(arg))
+      case arg => atVariance(variance * tparam.oldParamVarianceSign)(this(arg))
 
     protected def mapArgs(args: List[Type], tparams: List[ParamInfo]): List[Type] = args match
       case arg :: otherArgs if tparams.nonEmpty =>
@@ -6801,13 +6810,17 @@ object Types extends TypeUtils {
             // @return  operation succeeded for all arguments.
             def distributeArgs(args: List[Type], tparams: List[ParamInfo]): Boolean = args match {
               case Range(lo, hi) :: args1 =>
-                val v = tparams.head.paramVarianceSign
-                if (v == 0) false
-                else {
-                  if (v > 0) { loBuf += lo; hiBuf += hi }
-                  else { loBuf += hi; hiBuf += lo }
-                  distributeArgs(args1, tparams.tail)
-                }
+                tparams.head.paramVarianceSign match
+                  case Vs.Invariant => false
+                  case Vs.Covariant =>
+                    loBuf += lo; hiBuf += hi
+                    distributeArgs(args1, tparams.tail)
+                  case Vs.Contravariant =>
+                    loBuf += hi; hiBuf += lo
+                    distributeArgs(args1, tparams.tail)
+                  case Vs.Bivariant =>
+                    loBuf += BivariantAnyType; hiBuf += BivariantAnyType
+                    distributeArgs(args1, tparams.tail)
               case arg :: args1 =>
                 loBuf += arg; hiBuf += arg
                 distributeArgs(args1, tparams.tail)
@@ -6976,7 +6989,7 @@ object Types extends TypeUtils {
             val tparam = tparams.head
             val acc = args.head match {
               case arg: TypeBounds => this(x, arg)
-              case arg => atVariance(variance * tparam.paramVarianceSign)(this(x, arg))
+              case arg => atVariance(variance * tparam.oldParamVarianceSign)(this(x, arg))
             }
             foldArgs(acc, tparams.tail, args.tail)
           }

@@ -391,8 +391,8 @@ object Checking {
     }
 
     override def mapArg(arg: Type, tparam: ParamInfo): Type =
-      val varianceDiff = variance != tparam.paramVarianceSign
-      atVariance(variance * tparam.paramVarianceSign):
+      val varianceDiff = variance != tparam.oldParamVarianceSign
+      atVariance(variance * tparam.oldParamVarianceSign):
         // Using tests/pos/i22257.scala as an example,
         // if we consider FP's lower-bound of Fixed[Node]
         // than `Node` is a type argument in contravariant

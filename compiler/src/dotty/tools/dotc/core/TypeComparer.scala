@@ -1806,7 +1806,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
                   canDefer = false, Nil, Nil, Nil))
       else args2.nonEmpty && tparams2.nonEmpty && {
         val tparam = tparams2.head
-        val v = tparam.paramVarianceSign
+        val v = tparam.oldParamVarianceSign
 
         /** An argument test is incomplete if it implies a comparison A <: B where
          *  A is an AndType or B is an OrType. In these cases we need to run an
@@ -2606,7 +2606,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
         val arg1 :: args1Rest = args1: @unchecked
         val arg2 :: args2Rest = args2: @unchecked
         val common = singletonInterval(arg1, arg2)
-        val v = tparam.paramVarianceSign
+        val v = tparam.oldParamVarianceSign
         val lubArg =
           if (common.exists) common
           else if (v > 0) lub(arg1.hiBound, arg2.hiBound, canConstrain)
@@ -2638,7 +2638,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
         val arg1 :: args1Rest = args1: @unchecked
         val arg2 :: args2Rest = args2: @unchecked
         val common = singletonInterval(arg1, arg2)
-        val v = tparam.paramVarianceSign
+        val v = tparam.oldParamVarianceSign
         val glbArg =
           if (common.exists) common
           else if (v > 0) glb(arg1.hiBound, arg2.hiBound)
@@ -3312,7 +3312,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
 
     args1.lazyZip(args2).lazyZip(cls.typeParams).exists {
       (arg1, arg2, tparam) =>
-        val v = tparam.paramVarianceSign
+        val v = tparam.oldParamVarianceSign
         if (v > 0)
           covariantDisjoint(arg1, arg2, tparam)
         else if (v < 0)
@@ -3844,7 +3844,7 @@ class MatchReducer(initctx: Context) extends TypeComparer(initctx) {
         if argPatterns.isEmpty then
           true
         else
-          rec(argPatterns.head, args.head, tparams.head.paramVarianceSign, scrutIsWidenedAbstract)
+          rec(argPatterns.head, args.head, tparams.head.oldParamVarianceSign, scrutIsWidenedAbstract)
             && matchArgs(argPatterns.tail, args.tail, tparams.tail, scrutIsWidenedAbstract)
 
       // This might not be needed

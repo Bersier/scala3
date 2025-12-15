@@ -675,7 +675,7 @@ private class ExtractAPICollector(nonLocalClassSymbols: mutable.HashSet[Symbol])
   }
 
   def apiTypeParameter(tparam: ParamInfo): api.TypeParameter =
-    apiTypeParameter(tparam.paramName.toString, tparam.paramVarianceSign,
+    apiTypeParameter(tparam.paramName.toString, tparam.oldParamVarianceSign,
       tparam.paramInfo.bounds.lo, tparam.paramInfo.bounds.hi)
 
   def apiTypeParameter(name: String, variance: Int, lo: Type, hi: Type): api.TypeParameter =

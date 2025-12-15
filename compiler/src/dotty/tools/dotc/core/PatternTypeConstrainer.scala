@@ -237,7 +237,7 @@ trait PatternTypeConstrainer { self: TypeComparer =>
     def widenVariantParams(tp: Type) = tp match {
       case tp @ AppliedType(tycon, args) =>
         val args1 = args.zipWithConserve(tycon.typeParams)((arg, tparam) =>
-          if (tparam.paramVarianceSign != 0) TypeBounds.empty else arg
+          if (tparam.oldParamVarianceSign != 0) TypeBounds.empty else arg
         )
         tp.derivedAppliedType(tycon, args1)
       case tp =>
@@ -259,7 +259,7 @@ trait PatternTypeConstrainer { self: TypeComparer =>
       (tp, pt) match {
         case (AppliedType(tyconS, argsS), AppliedType(tyconP, argsP)) => rollbackConstraintsUnless:
           tyconS.typeParams.lazyZip(argsS).lazyZip(argsP).forall { (param, argS, argP) =>
-            val variance = param.paramVarianceSign
+            val variance = param.oldParamVarianceSign
             if variance == 0 || assumeInvariantRefinement ||
               // As a special case, when pattern and scrutinee types have the same type constructor,
               // we infer better bounds for pattern-bound abstract types.

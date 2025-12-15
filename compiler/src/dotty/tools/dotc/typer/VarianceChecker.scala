@@ -33,7 +33,7 @@ object VarianceChecker {
       case tl: HKTypeLambda if tl.isDeclaredVarianceLambda =>
         val checkOK = new TypeAccumulator[Boolean] {
           def paramVarianceSign(tref: TypeParamRef) =
-            tl.typeParams(tref.paramNum).paramVarianceSign
+            tl.typeParams(tref.paramNum).oldParamVarianceSign
           def error(tref: TypeParamRef) = {
             val paramName = tl.paramNames(tref.paramNum).toTermName
             val v = paramVarianceSign(tref)

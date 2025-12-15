@@ -916,7 +916,7 @@ object RefChecks {
         for
           caseCls <- clazz.info.baseClasses.tail.find(_.is(Case))
           baseCls <- caseCls.info.baseClasses.tail
-          if baseCls.typeParams.exists(_.paramVarianceSign != 0)
+          if baseCls.typeParams.exists(_.oldParamVarianceSign != 0)
           problem <- variantInheritanceProblems(baseCls, caseCls, i"base $baseCls", "case ")
           withExplain = problem.appendExplanation:
             """Refining a basetype of a case class is not allowed.
