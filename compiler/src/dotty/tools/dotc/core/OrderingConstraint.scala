@@ -2,17 +2,24 @@ package dotty.tools
 package dotc
 package core
 
-import Types.*, Contexts.*, Symbols.*, Decorators.*, TypeApplications.*
-import util.{SimpleIdentitySet, SimpleIdentityMap}
+import Types.*
+import Contexts.*
+import Symbols.*
+import Decorators.*
+import TypeApplications.*
+import util.{SimpleIdentityMap, SimpleIdentitySet}
+
 import collection.mutable
 import printing.Printer
 import printing.Texts.*
 import config.Config
 import config.Printers.constr
+
 import reflect.ClassTag
 import annotation.tailrec
 import annotation.internal.sharable
 import cc.{CapturingType, derivedCapturingType}
+import dotty.tools.dotc.core.Variances.Vs
 
 import scala.compiletime.uninitialized
 
@@ -350,8 +357,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       t match
       case param: TypeParamRef =>
         if hasBounds(param) then
-          if variance >= 0 then coDeps = update(coDeps, param)
-          if variance <= 0 then contraDeps = update(contraDeps, param)
+          if variance <= Vs.Covariant then coDeps = update(coDeps, param)
+          if variance <= Vs.Contravariant then contraDeps = update(contraDeps, param)
         else
           traverse(entry(param))
       case tp: LazyRef =>
@@ -373,7 +380,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
      *  @param  add     if true, add referenced variables to dependencies, otherwise drop them.
      */
     def adjustReferenced(bound: Type, isLower: Boolean, add: Boolean) =
-      adjuster.variance = if isLower then 1 else -1
+      adjuster.variance = if isLower then Vs.Covariant else Vs.Contravariant
       adjuster.add = add
       adjuster.seen.clear(resetToInitial = false)
       adjuster.traverse(bound)
@@ -936,8 +943,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
                 i"missing $depsName backwards reference $param -> $srcParam in $thisConstraint")
             entry(param) match
               case _: TypeBounds =>
-                if variance >= 0 then check(contraDeps, upper(param), "contra")
-                if variance <= 0 then check(coDeps, lower(param), "co")
+                if variance <= Vs.Covariant then check(contraDeps, upper(param), "contra")
+                if variance <= Vs.Contravariant then check(coDeps, lower(param), "co")
               case tp =>
                 traverse(tp)
           case tp: LazyRef =>
@@ -955,7 +962,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
             case t: TypeParamRef =>
               entry(t) match
                 case _: TypeBounds =>
-                  t == param && (variance == 0 || variance == v)
+                  t == param && (variance <= v)
                 case e =>
                   apply(x, e)
             case _ =>

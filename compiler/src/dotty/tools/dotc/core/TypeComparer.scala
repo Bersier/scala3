@@ -2,32 +2,43 @@ package dotty.tools
 package dotc
 package core
 
-import Types.*, Contexts.*, Symbols.*, Flags.*, Names.*, NameOps.*, Denotations.*
+import Types.*
+import Contexts.*
+import Symbols.*
+import Flags.*
+import Names.*
+import NameOps.*
+import Denotations.*
 import Decorators.*
-import Phases.{gettersPhase, elimByNamePhase}
+import Phases.{elimByNamePhase, gettersPhase}
 import StdNames.nme
 import TypeOps.refineUsingParent
+
 import collection.mutable
-import util.{Stats, NoSourcePosition, EqHashMap}
+import util.{EqHashMap, NoSourcePosition, Stats}
 import config.Config
 import config.Feature.{migrateTo3, sourceVersion}
-import config.Printers.{subtyping, gadts, matchTypes, capt, noPrinter}
+import config.Printers.{capt, gadts, matchTypes, noPrinter, subtyping}
 import config.SourceVersion
-import TypeErasure.{erasedLub, erasedGlb}
+import TypeErasure.{erasedGlb, erasedLub}
 import TypeApplications.*
-import Variances.{VarianceFlagSet, variancesConform}
+import Variances.{VarianceFlagSet, Vs, variancesConform}
 import Constants.Constant
+
 import scala.util.control.NonFatal
 import typer.ProtoTypes.constrained
 import typer.Applications.productSelectorTypes
 import reporting.trace
+
 import annotation.constructorOnly
 import cc.*
 import Capabilities.Capability
 import NameKinds.WildcardParamName
 import MatchTypes.isConcrete
 import reporting.Message.Note
-import scala.util.boundary, boundary.break
+
+import scala.util.boundary
+import boundary.break
 
 /** Provides methods to compare types.
  */
@@ -925,7 +936,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
         override def apply(x: Boolean, t: Type) =
           x && t.match
             case t: TypeParamRef =>
-              variance == 0
+              variance == Vs.Invariant
               || (t.binder ne caseLambda)
               || t.paramName.is(WildcardParamName)
               || { poisoned += t; true }
@@ -3616,7 +3627,7 @@ class MatchReducer(initctx: Context) extends TypeComparer(initctx) {
         case param @ TypeParamRef(b, n) if b eq caseLambda =>
           insts(n) =
             if canApprox then
-              approximation(param, fromBelow = variance >= 0, Int.MaxValue).simplified
+              approximation(param, fromBelow = variance <= Vs.Covariant, Int.MaxValue).simplified
             else constraint.entry(param) match
               case entry: TypeBounds =>
                 val lo = fullLowerBound(param)
@@ -3630,10 +3641,10 @@ class MatchReducer(initctx: Context) extends TypeComparer(initctx) {
           foldOver(insts, t)
 
     def instantiateParams(insts: Array[Type]) = new ApproximatingTypeMap {
-      variance = 0
+      variance = Vs.Invariant
 
       override def range(lo: Type, hi: Type): Type =
-        if variance == 0 && (lo eq hi) then
+        if variance == Vs.Invariant && (lo eq hi) then
           // override the default `lo eq hi` test, which removes the Range
           // which leads to a Reduced result, instead of NoInstance
           Range(lower(lo), upper(hi))
@@ -3647,7 +3658,7 @@ class MatchReducer(initctx: Context) extends TypeComparer(initctx) {
     }
 
     def instantiateParamsSpec(insts: Array[Type], caseLambda: HKTypeLambda) = new TypeMap {
-      variance = 0
+      variance = Vs.Invariant
 
       def apply(t: Type) = t match {
         case t @ TypeParamRef(b, n) if b `eq` caseLambda => insts(n)

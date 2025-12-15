@@ -36,6 +36,7 @@ object NameTags extends TastyFormat.NameTags {
   final val AVOIDUPPER = 35
   final val AVOIDLOWER = 36
   final val AVOIDBOTH = 37
+  final val AVOIDNONE = 40
 
   inline val EXPLICITFIELD = 38  // An explicitly named field, introduce to avoid a clash
                                  // with a regular field of the underlying name

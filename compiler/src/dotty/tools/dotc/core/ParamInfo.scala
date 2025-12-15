@@ -44,9 +44,7 @@ trait ParamInfo {
   final def oldParamVarianceSign(using Context): Int =
     varianceToInt(paramVariance)
 
-  /** The variance of the type parameter, as a number -1, 0, +1.
-   *  Bivariant is mapped to 1, i.e. it is treated like Covariant.
-   */
+  /** The variance of the type parameter */
   final def paramVarianceSign(using Context): Vs.Variance = Vs.fromFlagSet(paramVariance)
 
   /** A type that refers to the parameter */

@@ -3,9 +3,9 @@ package dotc
 package typer
 
 import core.*
-import ast.{Trees, tpd, untpd, desugar}
+import ast.{Trees, desugar, tpd, untpd}
 import util.Stats.record
-import util.{SrcPos, NoSourcePosition}
+import util.{NoSourcePosition, SrcPos}
 import Contexts.*
 import Flags.*
 import Symbols.*
@@ -22,7 +22,8 @@ import Typer.tryEither
 import ProtoTypes.*
 import Inferencing.*
 import reporting.*
-import Nullables.*, NullOpsDecorator.*
+import Nullables.*
+import NullOpsDecorator.*
 import config.{Feature, MigrationVersion, SourceVersion}
 import util.Property
 import util.chaining.tap
@@ -32,14 +33,14 @@ import config.Printers.{overload, typr, unapp}
 import inlines.Inlines
 import TypeApplications.*
 import Annotations.Annotation
-
 import Constants.{Constant, IntTag}
 import Denotations.SingleDenotation
-import annotation.threadUnsafe
 
+import annotation.threadUnsafe
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
 import dotty.tools.dotc.cc.isRetains
+import dotty.tools.dotc.core.Variances.Vs
 
 object Applications {
   import tpd.*
@@ -2126,7 +2127,7 @@ trait Applications extends Compatibility {
             def apply(t: Type) = t match
               case t @ AppliedType(tycon, args) =>
                 def mapArg(arg: Type, tparam: TypeParamInfo) =
-                  if (variance > 0 && tparam.oldParamVarianceSign < 0) defn.FunctionNOf(arg :: Nil, defn.UnitType)
+                  if (variance >= Vs.Covariant && tparam.oldParamVarianceSign < 0) defn.FunctionNOf(arg :: Nil, defn.UnitType)
                   else arg
                 mapOver(t.derivedAppliedType(tycon, args.zipWithConserve(tycon.typeParams)(mapArg)))
               case _ => mapOver(t)

@@ -18,14 +18,13 @@ import ErrorReporting.errorTree
 import util.Spans.Span
 import Phases.refchecksPhase
 import Constants.Constant
-
 import util.SrcPos
 import util.Spans.Span
 import rewrites.Rewrites.patch
 import inlines.Inlines
 import Decorators.*
 import ErrorReporting.{err, errorType}
-import config.Printers.{typr, patmatch}
+import config.Printers.{patmatch, typr}
 import NameKinds.DefaultGetterName
 import NameOps.*
 import SymDenotations.{NoCompleter, NoDenotation}
@@ -33,7 +32,8 @@ import Applications.UnapplyArgs
 import Inferencing.isFullyDefined
 import transform.patmat.SpaceEngine.{isIrrefutable, isIrrefutableQuotePattern}
 import transform.ValueClasses.underlyingOfValueClass
-import config.Feature, Feature.{sourceVersion, modularity}
+import config.Feature
+import Feature.{modularity, sourceVersion}
 import config.SourceVersion.*
 import config.MigrationVersion
 import printing.Formatting.hlAsKeyword
@@ -43,6 +43,7 @@ import cc.Mutability.isUpdateMethod
 import collection.mutable
 import reporting.*
 import Annotations.ExperimentalAnnotation
+import dotty.tools.dotc.core.Variances.Vs
 
 object Checking {
   import tpd.*
@@ -361,7 +362,7 @@ object Checking {
 
           if isInteresting(pre) then
             CyclicReference.trace(i"explore ${tp.symbol} for cyclic references"):
-              val pre1 = atVariance(variance max 0)(this(pre, false, false))
+              val pre1 = atVariance(variance & Vs.Covariant)(this(pre, false, false))
               if locked.contains(tp)
                   || tp.symbol.infoOrCompleter.isInstanceOf[NoCompleter]
                   && tp.symbol == sym
@@ -391,13 +392,13 @@ object Checking {
     }
 
     override def mapArg(arg: Type, tparam: ParamInfo): Type =
-      val varianceDiff = variance != tparam.oldParamVarianceSign
-      atVariance(variance * tparam.oldParamVarianceSign):
+      val varianceDiff = variance != tparam.paramVarianceSign
+      atVariance(variance * tparam.paramVarianceSign):
         // Using tests/pos/i22257.scala as an example,
         // if we consider FP's lower-bound of Fixed[Node]
         // than `Node` is a type argument in contravariant
         // position, while the type parameter is covariant.
-        val nestedCycleOK1 = nestedCycleOK || variance != 0 && varianceDiff
+        val nestedCycleOK1 = nestedCycleOK || variance != Vs.Invariant && varianceDiff
         this(arg, nestedCycleOK, nestedCycleOK1)
   }
 

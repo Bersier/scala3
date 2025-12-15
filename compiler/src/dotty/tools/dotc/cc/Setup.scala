@@ -3,25 +3,37 @@ package dotc
 package cc
 
 import core.*
-import Phases.*, DenotTransformers.*, SymDenotations.*
-import Contexts.*, Names.*, Flags.*, Symbols.*, Decorators.*
-import Types.*, StdNames.*
+import Phases.*
+import DenotTransformers.*
+import SymDenotations.*
+import Contexts.*
+import Names.*
+import Flags.*
+import Symbols.*
+import Decorators.*
+import Types.*
+import StdNames.*
 import Annotations.Annotation
 import config.Feature
 import config.Printers.{capt, captDebug}
-import ast.tpd, tpd.*
-import transform.{PreRecheck, Recheck}, Recheck.*
+import ast.tpd
+import tpd.*
+import transform.{PreRecheck, Recheck}
+import Recheck.*
 import Synthetics.isExcluded
 import util.SimpleIdentitySet
 import util.chaining.*
 import reporting.Message
-import printing.{Printer, Texts}, Texts.{Text, Str}
+import printing.{Printer, Texts}
+import Texts.{Str, Text}
+
 import collection.mutable
 import CCState.*
 import CheckCaptures.CheckerAPI
 import NamerOps.methodType
 import NameKinds.{CanThrowEvidenceName, TryOwnerName}
 import Capabilities.*
+import dotty.tools.dotc.core.Variances.Vs
 
 /** Operations accessed from CheckCaptures */
 trait SetupAPI:
@@ -127,9 +139,9 @@ class Setup extends PreRecheck, SymTransformer, SetupAPI:
       val seen = util.HashSet[Symbol]()
       def apply(x: Boolean, tp: Type): Boolean =
         if x then true
-        else if tp.derivesFromCapability && variance >= 0 then true
+        else if tp.derivesFromCapability && variance <= Vs.Covariant then true
         else tp.dealiasKeepAnnots match
-          case AnnotatedType(_, ann) if ann.symbol.isRetains && variance >= 0 => true
+          case AnnotatedType(_, ann) if ann.symbol.isRetains && variance <= Vs.Covariant => true
           case t: TypeRef if t.symbol.isAbstractOrParamType && !seen.contains(t.symbol) =>
             seen += t.symbol
             apply(x, t.info.bounds.hi)
@@ -191,7 +203,7 @@ class Setup extends PreRecheck, SymTransformer, SetupAPI:
 
     final def apply(tp: Type) =
       val saved = isTopLevel
-      if variance < 0 then isTopLevel = false
+      if variance >= Vs.Contravariant then isTopLevel = false
       try tp match
         case defn.RefinedFunctionOf(rinfo: MethodType) =>
           val rinfo1 = apply(rinfo)
@@ -925,7 +937,7 @@ class Setup extends PreRecheck, SymTransformer, SetupAPI:
             t.derivedRefinedType(t.parent, t.refinedName, this(rinfo))
           case _ =>
             mapOver(t)
-        if variance > 0 then t1
+        if variance >= Vs.Covariant then t1
         else decorate(t1, Function.const(CaptureSet.Fluid))
 
   /** Replace all universal capture sets in this type by <fluid> */

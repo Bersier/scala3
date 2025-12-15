@@ -6229,9 +6229,9 @@ object Types extends TypeUtils {
 
   /** Common base class of TypeMap and TypeAccumulator */
   abstract class VariantTraversal:
-    protected[dotc] var variance: Int = 1
+    protected[dotc] var variance: Vs.Variance = Vs.Covariant
 
-    inline protected def atVariance[T](v: Int)(op: => T): T = {
+    inline protected def atVariance[T](v: Vs.Variance)(op: => T): T = {
       val saved = variance
       variance = v
       val res = op
@@ -6350,7 +6350,7 @@ object Types extends TypeUtils {
 
     protected def mapArg(arg: Type, tparam: ParamInfo): Type = arg match
       case arg: TypeBounds => this(arg)
-      case arg => atVariance(variance * tparam.oldParamVarianceSign)(this(arg))
+      case arg => atVariance(variance * tparam.paramVarianceSign)(this(arg))
 
     protected def mapArgs(args: List[Type], tparams: List[ParamInfo]): List[Type] = args match
       case arg :: otherArgs if tparams.nonEmpty =>
@@ -6364,7 +6364,7 @@ object Types extends TypeUtils {
     protected def mapOverLambda(tp: LambdaType) =
       val restpe = tp.resultType
       val saved = variance
-      variance = if (defn.MatchCase.isInstance(restpe)) 0 else -variance
+      variance = if (defn.MatchCase.isInstance(restpe)) Vs.Invariant else variance.flip
       val ptypes1 = tp.paramInfos.mapConserve(this).asInstanceOf[List[tp.PInfo]]
       variance = saved
       derivedLambdaType(tp)(ptypes1, this(restpe))
@@ -6375,7 +6375,7 @@ object Types extends TypeUtils {
 
     def isRange(tp: Type): Boolean = tp.isInstanceOf[Range]
 
-    protected def mapCapturingType(tp: Type, parent: Type, refs: CaptureSet, v: Int): Type =
+    protected def mapCapturingType(tp: Type, parent: Type, refs: CaptureSet, v: Vs.Variance): Type =
       val saved = variance
       variance = v
       try derivedCapturingType(tp, this(parent), refs.map(this))
@@ -6465,7 +6465,7 @@ object Types extends TypeUtils {
         case tp: NamedType =>
           if stopBecauseStaticOrLocal(tp) then tp
           else
-            val prefix1 = atVariance(variance max 0)(this(tp.prefix)) // see comment of TypeAccumulator's applyToPrefix
+            val prefix1 = atVariance(variance & Vs.Covariant)(this(tp.prefix)) // see comment of TypeAccumulator's applyToPrefix
             derivedSelect(tp, prefix1)
 
         case tp: AppliedType =>
@@ -6478,9 +6478,9 @@ object Types extends TypeUtils {
           derivedAlias(tp, atVariance(0)(this(tp.alias)))
 
         case tp: TypeBounds =>
-          variance = -variance
+          variance = variance.flip
           val lo1 = this(tp.lo)
-          variance = -variance
+          variance = variance.flip
           derivedTypeBounds(tp, lo1, this(tp.hi))
 
         case tp: TypeVar =>
@@ -6614,8 +6614,9 @@ object Types extends TypeUtils {
   abstract class ApproximatingTypeMap(using Context) extends TypeMap { thisMap =>
 
     protected def range(lo: Type, hi: Type): Type =
-      if variance > 0 then hi
-      else if variance < 0 then
+      if variance == Vs.Bivariant then BivariantAnyType
+      else if variance == Vs.Covariant then hi
+      else if variance == Vs.Contravariant then
         if (lo eq defn.NothingType) then
           // Approximate by Nothing & hi instead of just Nothing, in case the
           // approximated type is used as the prefix of another type (this would
@@ -6675,7 +6676,7 @@ object Types extends TypeUtils {
     protected def expandBounds(tp: TypeBounds): Type =
       val saved = expandingBounds
       expandingBounds = true
-      val res = range(atVariance(-variance)(reapply(tp.lo)), reapply(tp.hi))
+      val res = range(atVariance(variance.flip)(reapply(tp.lo)), reapply(tp.hi))
       expandingBounds = saved
       res
 
@@ -6749,7 +6750,7 @@ object Types extends TypeUtils {
           if (parent.isExactlyNothing) parent
           else info match {
             case Range(infoLo: TypeBounds, infoHi: TypeBounds) =>
-              assert(variance == 0)
+              assert(variance == Vs.Invariant)
               if (!infoLo.isTypeAlias && !infoHi.isTypeAlias) propagate(infoLo, infoHi)
               else range(defn.NothingType, parent)
             case Range(infoLo, infoHi) =>
@@ -6770,7 +6771,7 @@ object Types extends TypeUtils {
       if (alias eq tp.alias) tp
       else alias match {
         case Range(lo, hi) =>
-          if (variance > 0) TypeBounds(lo, hi)
+          if (variance >= Vs.Covariant) TypeBounds(lo, hi)
           else range(tp.derivedAlias(lo), tp.derivedAlias(hi))
         case _ => tp.derivedAlias(alias)
       }
@@ -6778,7 +6779,7 @@ object Types extends TypeUtils {
     override protected def derivedTypeBounds(tp: TypeBounds, lo: Type, hi: Type): Type =
       if ((lo eq tp.lo) && (hi eq tp.hi)) tp
       else if (isRange(lo) || isRange(hi))
-        if (variance > 0) TypeBounds(lower(lo), upper(hi))
+        if (variance >= Vs.Covariant) TypeBounds(lower(lo), upper(hi))
         else range(TypeBounds(upper(lo), lower(hi)), TypeBounds(lower(lo), upper(hi)))
       else tp.derivedTypeBounds(lo, hi)
 
@@ -6792,7 +6793,7 @@ object Types extends TypeUtils {
           range(derivedAppliedType(tp, tyconLo, args), derivedAppliedType(tp, tyconHi, args))
         case _ =>
           if args.exists(isRange) then
-            if variance > 0 then
+            if variance >= Vs.Covariant then
               tp.derivedAppliedType(tycon, args.map(rangeToBounds)) match
                 case tp1: AppliedType if tp1.isUnreducibleWild && ctx.phase != checkCapturesPhase =>
                   // don't infer a type that would trigger an error later in
@@ -6946,7 +6947,7 @@ object Types extends TypeUtils {
   class AvoidWildcardsMap(using Context) extends ApproximatingTypeMap:
     protected def mapWild(t: WildcardType) =
       val bounds = t.effectiveBounds
-      range(atVariance(-variance)(apply(bounds.lo)), apply(bounds.hi))
+      range(atVariance(variance.flip)(apply(bounds.lo)), apply(bounds.hi))
     def apply(t: Type): Type = t match
       case t: WildcardType => mapWild(t)
       case _ => mapOver(t)
@@ -6970,7 +6971,7 @@ object Types extends TypeUtils {
      *  more relaxed scheme is used.
      */
     protected def applyToPrefix(x: T, tp: NamedType): T =
-      atVariance(variance max 0)(this(x, tp.prefix))
+      atVariance(variance & Vs.Covariant)(this(x, tp.prefix))
 
     def foldOver(x: T, tp: Type): T = {
       record(s"foldOver $getClass")
@@ -6989,7 +6990,7 @@ object Types extends TypeUtils {
             val tparam = tparams.head
             val acc = args.head match {
               case arg: TypeBounds => this(x, arg)
-              case arg => atVariance(variance * tparam.oldParamVarianceSign)(this(x, arg))
+              case arg => atVariance(variance * tparam.paramVarianceSign)(this(x, arg))
             }
             foldArgs(acc, tparams.tail, args.tail)
           }
@@ -7000,7 +7001,7 @@ object Types extends TypeUtils {
       case tp: LambdaType =>
         val restpe = tp.resultType
         val saved = variance
-        variance = if (defn.MatchCase.isInstance(restpe)) 0 else -variance
+        variance = if (defn.MatchCase.isInstance(restpe)) Vs.Invariant else variance.flip
         val y = foldOver(x, tp.paramInfos)
         variance = saved
         this(y, restpe)
@@ -7017,9 +7018,9 @@ object Types extends TypeUtils {
       case bounds @ TypeBounds(lo, hi) =>
         if (lo eq hi) atVariance(0)(this(x, lo))
         else {
-          variance = -variance
+          variance = variance.flip
           val y = this(x, lo)
-          variance = -variance
+          variance = variance.flip
           this(y, hi)
         }
 
@@ -7200,11 +7201,12 @@ object Types extends TypeUtils {
       /** Return a new map taking into account that K appears in a
        *  {co,contra,in}-variant position if `localVariance` is {positive,negative,zero}.
        */
-      def recordLocalVariance(k: K, localVariance: Int): VarianceMap[K] =
+      def recordLocalVariance(k: K, localVariance: Vs.Variance): VarianceMap[K] =
         val previousVariance = vmap(k)
         if previousVariance == null then
-          vmap.updated(k, localVariance)
-        else if previousVariance == localVariance || previousVariance == 0 then
+          vmap.updated(k, localVariance.asInstanceOf[Int])
+        else if previousVariance.asInstanceOf[Vs.Variance] == localVariance
+          || previousVariance.asInstanceOf[Vs.Variance] == Vs.Invariant then
           vmap
         else
           vmap.updated(k, 0)

@@ -394,6 +394,7 @@ object NameKinds {
     case UpperBound extends AvoidNameKind(AVOIDUPPER, "(upper)")
     case LowerBound extends AvoidNameKind(AVOIDLOWER, "(lower)")
     case BothBounds extends AvoidNameKind(AVOIDBOTH, "(avoid)")
+    case NeitherBound extends AvoidNameKind(AVOIDNONE, "(avoid none)")
 
   val BodyRetainerName: SuffixNameKind = new SuffixNameKind(BODYRETAINER, "$retainedBody")
   val FieldName: SuffixNameKind = new SuffixNameKind(FIELD, "$$local") {

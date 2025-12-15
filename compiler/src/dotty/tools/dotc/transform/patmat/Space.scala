@@ -4,20 +4,33 @@ package transform
 package patmat
 
 import core.*
-import Constants.*, Contexts.*, Decorators.*, Flags.*, NullOpsDecorator.*, Symbols.*, Types.*
-import Names.*, NameOps.*, StdNames.*
-import ast.*, tpd.*
+import Constants.*
+import Contexts.*
+import Decorators.*
+import Flags.*
+import NullOpsDecorator.*
+import Symbols.*
+import Types.*
+import Names.*
+import NameOps.*
+import StdNames.*
+import ast.*
+import tpd.*
 import config.Printers.exhaustivity
-import printing.{ Printer, * }, Texts.*
+import printing.{Printer, *}
+import Texts.*
 import reporting.*
-import typer.*, Applications.*, Inferencing.*, ProtoTypes.*
+import typer.*
+import Applications.*
+import Inferencing.*
+import ProtoTypes.*
 import util.*
 
 import scala.annotation.internal.sharable
 import scala.annotation.tailrec
 import scala.collection.mutable
-
 import SpaceEngine.*
+import dotty.tools.dotc.core.Variances.Vs
 
 /* Space logic for checking exhaustivity and unreachability of pattern matching
  *
@@ -876,7 +889,7 @@ object SpaceEngine {
   private def shouldCheckExamples(tp: Type)(using Context): Boolean =
     new TypeAccumulator[Boolean] {
       override def apply(b: Boolean, tp: Type): Boolean = tp match {
-        case tref: TypeRef if tref.symbol.is(TypeParam) && variance != 1 => true
+        case tref: TypeRef if tref.symbol.is(TypeParam) && !(variance >= Vs.Covariant) => true
         case tp => b || foldOver(b, tp)
       }
     }.apply(false, tp)

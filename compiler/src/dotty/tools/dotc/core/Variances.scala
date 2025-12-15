@@ -29,14 +29,46 @@ object Variances {
 
     extension (v: Variance)
       inline def invert: Variance = v ^ 3
+
       inline def flip: Variance = (flipLookupTable >>> (v << 1)) & 3
+
       inline def *(w: Variance): Variance =
         (timesLookupTable >>> ((v << 3) | (w << 1))) & 3
-      def toFlagSet: VarianceFlagSet = v match
+
+      /** Does variance `v` conform to variance `w`? */
+      inline def <=(w: Variance): Boolean =
+        (v | w) == w
+
+      inline def >=(w: Variance): Boolean =
+        (v & w) == v
+
+      inline def unary_- : Variance = v.flip
+
+      /** The intersection of `v` and `w` */
+      inline def &(w: Variance): Variance = v & w
+
+      /** The union of `v` and `w` */
+      inline def |(w: Variance): Variance = v | w
+
+      def asFlagSet: VarianceFlagSet = v match
         case Invariant => InvariantFlagSet
         case Covariant => CovariantFlagSet
         case Contravariant => ContravariantFlagSet
         case Bivariant => BivariantFlagSet
+        case _ => throw AssertionError(s"Impossible variance: $v")
+
+      def signString: String = v match
+        case Invariant => ""
+        case Covariant => "+"
+        case Contravariant => "-"
+        case Bivariant => "+-"
+        case _ => throw AssertionError(s"Impossible variance: $v")
+
+      def label: String = v match
+        case Invariant => "invariant"
+        case Covariant => "covariant"
+        case Contravariant => "contravariant"
+        case Bivariant => "bivariant"
         case _ => throw AssertionError(s"Impossible variance: $v")
   end Vs
 
@@ -66,7 +98,7 @@ object Variances {
     object narrowVariances extends TypeTraverser {
       def traverse(t: Type): Unit = t match
         case t: TypeParamRef if t.binder eq lam =>
-          lam.typeParams(t.paramNum).storedVariance &= varianceFromInt(variance)
+          lam.typeParams(t.paramNum).storedVariance &= variance.asFlagSet
         case _ =>
           traverseChildren(t)
     }
@@ -99,7 +131,7 @@ object Variances {
     else tparams1.hasSameLengthAs(tparams2)
 
   def varianceSign(v: VarianceFlagSet): String = varianceSign(varianceToInt(v))
-  def varianceLabel(v: VarianceFlagSet): String = varianceLabel(varianceToInt(v))
+  def varianceLabel(v: VarianceFlagSet): String = Vs.fromFlagSet(v).label
 
   def varianceSign(v: Int): String =
     if (v > 0) "+"

@@ -4,16 +4,22 @@ package typer
 
 import core.*
 import ast.*
-import Contexts.*, Types.*, Flags.*, Symbols.*
+import Contexts.*
+import Types.*
+import Flags.*
+import Symbols.*
 import ProtoTypes.*
 import NameKinds.UniqueName
 import util.Spans.*
-import util.{Stats, SimpleIdentityMap, SimpleIdentitySet, SrcPos}
-import Decorators._
+import util.{SimpleIdentityMap, SimpleIdentitySet, SrcPos, Stats}
+import Decorators.*
 import config.Printers.{gadts, typr}
+
 import annotation.tailrec
 import reporting.*
 import TypeAssigner.SkolemizedArgs
+import dotty.tools.dotc.core.Variances.Vs
+
 import collection.mutable
 import scala.annotation.internal.sharable
 
@@ -177,13 +183,13 @@ object Inferencing {
         def tryWidened(widened: Type): Type =
           val improved = apply(widened)
           if improved ne widened then improved else mapOver(t)
-        if variance > 0 then
+        if variance == Vs.Covariant then
           t match
             case t: TypeRef =>
               if t.symbol == defn.NothingClass then
                 val notExactlyNothing = LazyRef(_ => defn.NothingType)
                 val bounds = TypeBounds(notExactlyNothing, defn.AnyType)
-                  // The new type variale has a slightly disguised lower bound Nothing.
+                  // The new type variable has a slightly disguised lower bound Nothing.
                   // This foils the `isExactlyNothing` test in `hasLowerBound` and
                   // therefore makes the new type variable have a lower bound. That way,
                   // we favor in `apply` below instantiating from below to `Nothing` instead
@@ -315,11 +321,11 @@ object Inferencing {
       *     approx, see gadt-approximation-interaction.scala).
       */
     def apply(tp: Type): Type = tp.dealias match {
-      case tp @ TypeRef(qual, nme) if variance != 0
+      case tp @ TypeRef(qual, nme) if variance != Vs.Invariant
                                    && ctx.gadt.contains(tp.symbol)
                                    =>
         val sym = tp.symbol
-        val res = ctx.gadtState.approximation(sym, fromBelow = variance < 0)
+        val res = ctx.gadtState.approximation(sym, fromBelow = variance == Vs.Contravariant)
         gadts.println(i"approximated $tp  ~~  $res")
         res
 
@@ -448,7 +454,7 @@ object Inferencing {
   enum Decision:
     case Min, Max, ToMax, Skip, Fail
 
-  private def instDecision(tvar: TypeVar, v: Int, minimizeSelected: Boolean, ifBottom: IfBottom)(using Context): Decision =
+  private def instDecision(tvar: TypeVar, v: Vs.Variance, minimizeSelected: Boolean, ifBottom: IfBottom)(using Context): Decision =
     import Decision.*
     val direction = instDirection(tvar.origin)
     val dec = if minimizeSelected then
@@ -557,7 +563,7 @@ object Inferencing {
     val constraint = ctx.typerState.constraint
 
     object accu extends TypeAccumulator[VarianceMap[TypeVar]]:
-      def setVariance(v: Int) = variance = v
+      def setVariance(v: Vs.Variance) = variance = v
       def apply(vmap: VarianceMap[TypeVar], t: Type): VarianceMap[TypeVar] = t match
         case t: TypeVar
         if !t.isInstantiated && accCtx.typerState.constraint.contains(t) =>

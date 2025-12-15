@@ -3,24 +3,32 @@ package dotc
 package cc
 
 import core.*
-import Types.*, Symbols.*, Contexts.*, Decorators.*
-import util.{SimpleIdentitySet, EqHashMap}
+import Types.*
+import Symbols.*
+import Contexts.*
+import Decorators.*
+import util.{EqHashMap, SimpleIdentitySet}
 import util.common.alwaysTrue
+
 import scala.collection.mutable
 import CCState.*
 import Periods.{NoRunId, RunWidth}
+
 import compiletime.uninitialized
 import StdNames.nme
-import CaptureSet.{Refs, emptyRefs, VarState}
+import CaptureSet.{Refs, VarState, emptyRefs}
 import Annotations.Annotation
 import Flags.*
 import config.Printers.capt
+
 import annotation.constructorOnly
 import ast.tpd
 import printing.{Printer, Showable}
 import printing.Texts.Text
 import reporting.{Message, trace}
 import NameOps.isImpureFunction
+import dotty.tools.dotc.core.Variances.Vs
+
 import annotation.internal.sharable
 import collection.immutable
 
@@ -1031,7 +1039,7 @@ object Capabilities:
     thisMap =>
 
     override def apply(t: Type) =
-      if variance < 0 then t
+      if variance >= Vs.Contravariant then t
       else t match
         case t @ CapturingType(_, _) =>
           mapOver(t)
@@ -1106,7 +1114,7 @@ object Capabilities:
     val freshToResult = EqHashMap[FreshCap, ResultCap]()
 
     override def apply(t: Type) =
-      if variance < 0 then t
+      if variance >= Vs.Contravariant then t
       else t match
         case t: ParamRef =>
           if t.binder == this.binder then paramSyms(t.paramNum).termRef else t
@@ -1126,7 +1134,7 @@ object Capabilities:
 
     class Inverse extends BiTypeMap:
       def apply(t: Type): Type =
-        if variance < 0 then t
+        if variance >= Vs.Contravariant then t
         else t match
           case t: TermRef if paramSyms.contains(t) =>
             binder.paramRefs(paramSyms.indexOf(t.symbol))
@@ -1188,7 +1196,7 @@ object Capabilities:
 
   abstract class CapMap(using Context) extends BiTypeMap:
     override def mapOver(t: Type): Type = t match
-      case t @ FunctionOrMethod(args, res) if variance > 0 && !t.isAliasFun =>
+      case t @ FunctionOrMethod(args, res) if variance >= Vs.Covariant && !t.isAliasFun =>
         t // `t` should be mapped in this case by a different call to `toResult`. See [[toResultInResults]].
       case t: (LazyRef | TypeVar) =>
         mapConserveSuper(t)
@@ -1199,7 +1207,7 @@ object Capabilities:
 
     def apply(t: Type) = t match
       case defn.FunctionNOf(args, res, contextual) if t.typeSymbol.name.isImpureFunction =>
-        if variance > 0 then
+        if variance >= Vs.Covariant then
           super.mapOver:
             defn.FunctionNOf(args, res, contextual)
               .capturing(ResultCap(mt).singletonCaptureSet)
@@ -1209,7 +1217,7 @@ object Capabilities:
 
     override def mapCapability(c: Capability, deep: Boolean) = c match
       case c: (FreshCap | GlobalCap.type) =>
-        if variance > 0 then
+        if variance >= Vs.Covariant then
           c match
             case c: FreshCap =>
               if sym.isAnonymousFunction && c.classifier.derivesFrom(defn.Caps_Unscoped)
@@ -1217,7 +1225,7 @@ object Capabilities:
               else ResultCap(mt).setOrigin(c)
             case _ => ResultCap(mt)
         else
-          if variance == 0 then
+          if variance == Vs.Invariant then
             fail(em"""$localResType captures the root capability `cap` in invariant position.
                       |This capability cannot be converted to an existential in the result type of a function.""")
           // we accept variance < 0, and leave the cap as it is
@@ -1270,7 +1278,7 @@ object Capabilities:
             if rt.isInstanceOf[InferredRefinedType]
             then mapOver(mt)
             else apply(mt))
-        case t: MethodType if variance > 0 && t.marksExistentialScope =>
+        case t: MethodType if variance >= Vs.Covariant && t.marksExistentialScope =>
           val t1 = mapOver(t).asInstanceOf[MethodType]
           t1.derivedLambdaType(resType = toResult(t1.resType, t1, sym, fail))
         case CapturingType(parent, refs) =>

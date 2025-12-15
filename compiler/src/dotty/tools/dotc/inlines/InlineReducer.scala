@@ -2,8 +2,13 @@ package dotty.tools
 package dotc
 package inlines
 
-import ast.*, core.*
-import Flags.*, Symbols.*, Types.*, Decorators.*, Contexts.*
+import ast.*
+import core.*
+import Flags.*
+import Symbols.*
+import Types.*
+import Decorators.*
+import Contexts.*
 import StdNames.nme
 import typer.*
 import Names.TermName
@@ -11,6 +16,7 @@ import NameKinds.{InlineAccessorName, InlineBinderName, InlineScrutineeName}
 import config.Printers.inlining
 import util.SimpleIdentityMap
 import CheckRealizable.{Realizable, realizability}
+import dotty.tools.dotc.core.Variances.Vs
 
 import collection.mutable
 
@@ -261,7 +267,7 @@ class InlineReducer(inliner: Inliner)(using Context):
                   val v = syms(trSym)
                   if (v != null) v else false
                 }
-                syms.updated(trSym, wasToBeMinimized || variance >= 0 : java.lang.Boolean)
+                syms.updated(trSym, wasToBeMinimized || variance <= Vs.Covariant : java.lang.Boolean)
               case _ =>
                 syms
             }

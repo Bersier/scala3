@@ -39,6 +39,7 @@ import dotty.tools.dotc.util.SourceFile
 import dotty.tools.dotc.config.SourceVersion
 import DidYouMean.*
 import Message.{Disambiguation, Note}
+import Variances.Vs
 
 /**  Messages
   *  ========
@@ -315,16 +316,18 @@ class TypeMismatch(val found: Type, expected: Type, val inTree: Option[untpd.Tre
     // lead to a recursive infinite expansion.
     object reported extends TypeMap, IdentityCaptRefMap:
       var notes: String = ""
-      def setVariance(v: Int) = variance = v
+      def setVariance(v: Vs.Variance) = variance = v
       val constraint = mapCtx.typerState.constraint
       var fbounded = false
       def apply(tp: Type): Type = tp match
         case tp: TypeParamRef =>
           constraint.entry(tp) match
-            case bounds: TypeBounds =>
-              if variance < 0 then apply(TypeComparer.fullUpperBound(tp))
-              else if variance > 0 then apply(TypeComparer.fullLowerBound(tp))
-              else tp
+            case bounds: TypeBounds => variance match
+              case Vs.Contravariant => apply(TypeComparer.fullUpperBound(tp))
+              case Vs.Covariant => apply(TypeComparer.fullLowerBound(tp))
+              case Vs.Invariant => tp
+              case Vs.Bivariant => BivariantAnyType
+              case _ => throw AssertionError(s"Impossible variance: $v")
             case NoType => tp
             case instType => apply(instType)
         case tp: TypeVar =>

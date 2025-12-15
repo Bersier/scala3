@@ -3,10 +3,15 @@ package dotc
 package cc
 
 import core.*
-import Types.*, Symbols.*, Contexts.*, Annotations.*, Flags.*
+import Types.*
+import Symbols.*
+import Contexts.*
+import Annotations.*
+import Flags.*
 import Names.{Name, TermName}
 import ast.{tpd, untpd}
-import Decorators.*, NameOps.*
+import Decorators.*
+import NameOps.*
 import config.Printers.capt
 import util.Property.Key
 import tpd.*
@@ -17,6 +22,7 @@ import Mutability.isStatefulType
 import StdNames.nme
 import config.Feature
 import NameKinds.TryOwnerName
+import dotty.tools.dotc.core.Variances.Vs
 import typer.ProtoTypes.WildcardSelectionProto
 
 /** Attachment key for capturing type trees */
@@ -418,7 +424,7 @@ extension (tp: Type)
       object narrowCaps extends TypeMap:
         var change = false
         def apply(t: Type) =
-          if variance <= 0 then t
+          if variance >= Vs.Contravariant then t
           else t.dealias match
             case t @ CapturingType(p, cs) if cs.containsCapOrFresh =>
               val reachRef = if cs.isReadOnly then ref.reach.readOnly else ref.reach
@@ -450,7 +456,7 @@ extension (tp: Type)
     val acc = new TypeAccumulator[Boolean]:
       def apply(x: Boolean, t: Type) =
         x
-        || variance > 0 && t.dealiasKeepAnnots.match
+        || variance >= Vs.Covariant && t.dealiasKeepAnnots.match
           case t @ CapturingType(p, cs) if cs.containsCap =>
             true
           case t @ AnnotatedType(parent, ann) =>
@@ -756,7 +762,7 @@ abstract class DeepTypeAccumulator[T](using Context) extends TypeAccumulator[T]:
   protected def abstractTypeCase(acc: T, t: TypeRef, upperBound: Type): T
 
   def apply(acc: T, t: Type) =
-    if variance < 0 then acc
+    if variance >= Vs.Contravariant then acc
     else t.dealias match
       case t @ CapturingType(parent, cs) =>
         capturingCase(acc, parent, cs, t.isBoxed)

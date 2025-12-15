@@ -3,8 +3,15 @@ package dotc
 package transform
 
 import core.*
-import Symbols.*, Contexts.*, Types.*, ContextOps.*, Decorators.*, SymDenotations.*
-import Flags.*, NameKinds.*, Denotations.{Denotation, SingleDenotation}
+import Symbols.*
+import Contexts.*
+import Types.*
+import ContextOps.*
+import Decorators.*
+import SymDenotations.*
+import Flags.*
+import NameKinds.*
+import Denotations.{Denotation, SingleDenotation}
 import ast.*
 import Names.Name
 import Phases.Phase
@@ -19,9 +26,11 @@ import reporting.Message.Note
 import config.Printers.recheckr
 import util.Property
 import StdNames.nme
+
 import annotation.constructorOnly
 import annotation.tailrec
 import dotty.tools.dotc.cc.boxed
+import dotty.tools.dotc.core.Variances.Vs
 
 object Recheck:
   import tpd.*
@@ -616,7 +625,7 @@ abstract class Recheck extends Phase, SymTransformer:
       object widenSkolems extends TypeMap:
         var didWiden: Boolean = false
         def apply(t: Type): Type = t match
-          case t: SkolemType if variance >= 0 =>
+          case t: SkolemType if variance <= Vs.Covariant =>
             didWiden = true
             apply(t.underlying)
           case t: LazyRef => t

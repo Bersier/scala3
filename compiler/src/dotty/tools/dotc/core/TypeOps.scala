@@ -2,12 +2,18 @@ package dotty.tools
 package dotc
 package core
 
-import Contexts.*, Types.*, Symbols.*, Names.*, NameKinds.*, Flags.*
+import Contexts.*
+import Types.*
+import Symbols.*
+import Names.*
+import NameKinds.*
+import Flags.*
 import SymDenotations.*
 import util.Spans.*
 import util.Stats
 import Decorators.*
 import StdNames.*
+
 import collection.mutable
 import ast.tpd.*
 import reporting.trace
@@ -19,8 +25,9 @@ import typer.Inferencing.*
 import typer.IfBottom
 import reporting.TestingReporter
 import Annotations.Annotation
-import cc.{CapturingType, derivedCapturingType, CaptureSet, captureSet, isBoxed, isBoxedCapturing}
+import cc.{CaptureSet, CapturingType, captureSet, derivedCapturingType, isBoxed, isBoxedCapturing}
 import CaptureSet.{IdentityCaptRefMap, VarState}
+import dotty.tools.dotc.core.Variances.Vs
 
 import scala.annotation.internal.sharable
 import scala.annotation.threadUnsafe
@@ -82,7 +89,7 @@ object TypeOps:
           case pre: SuperType => toPrefix(pre.thistpe, cls, thiscls)
           case _ =>
             if (thiscls.derivesFrom(cls) && pre.baseType(thiscls).exists)
-              if (variance <= 0 && !isLegalPrefix(pre))
+              if (variance <= Vs.Contravariant && !isLegalPrefix(pre))
                 approxCount += 1
                 range(defn.NothingType, pre)
               else pre
@@ -101,7 +108,7 @@ object TypeOps:
             val sym = tp.symbol
             if sym.isStatic && !sym.maybeOwner.seesOpaques || (tp.prefix `eq` NoPrefix)
             then tp
-            else derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
+            else derivedSelect(tp, atVariance(variance & Vs.Covariant)(this(tp.prefix)))
           case tp: LambdaType =>
             mapOverLambda(tp) // special cased common case
           case tp: ThisType =>
@@ -484,7 +491,7 @@ object TypeOps:
               case info: AliasingBounds =>
                 apply(info.alias)
               case TypeBounds(lo, hi) =>
-                range(atVariance(-variance)(apply(lo)), apply(hi))
+                range(atVariance(variance.flip)(apply(lo)), apply(hi))
               case info: ClassInfo =>
                 range(defn.NothingType, apply(classBound(info)))
               case _ =>
@@ -521,7 +528,7 @@ object TypeOps:
       if (pre eq tp.prefix)
         tp
       else (if pre.isSingleton then NoType else tryWiden(tp, tp.prefix)).orElse {
-        if (tp.isTerm && variance > 0 && !pre.isSingleton)
+        if (tp.isTerm && variance >= Vs.Covariant && !pre.isSingleton)
           tp.prefix match
             case inlines.Inliner.OpaqueProxy(ref) =>
               // Strip refinements on an opaque alias proxy
@@ -574,7 +581,7 @@ object TypeOps:
         case tp: TypeVar if mapCtx.typerState.constraint.contains(tp) =>
           val lo = TypeComparer.instanceType(
             tp.origin,
-            fromBelow = variance > 0 || variance == 0 && tp.hasLowerBound,
+            fromBelow = variance >= Vs.Covariant || variance == Vs.Invariant && tp.hasLowerBound,
             tp.widenPolicy)(using mapCtx)
           val lo1 = apply(lo)
           if (lo1 ne lo) lo1 else tp
@@ -980,7 +987,7 @@ object TypeOps:
   /** Map no-flip covariant occurrences of `into[T]` to `T @$into` */
   def suppressInto(using Context) = new FollowAliasesMap:
     def apply(t: Type): Type = t match
-      case AppliedType(tycon: TypeRef, arg :: Nil) if variance >= 0 && defn.isInto(tycon.symbol) =>
+      case AppliedType(tycon: TypeRef, arg :: Nil) if variance <= Vs.Covariant && defn.isInto(tycon.symbol) =>
         AnnotatedType(arg, Annotation(defn.SilentIntoAnnot, util.Spans.NoSpan))
       case _: MatchType | _: LazyRef =>
         t
@@ -990,7 +997,7 @@ object TypeOps:
   /** Map no-flip covariant occurrences of `T @$into` to `into[T]` */
   def revealInto(using Context) = new FollowAliasesMap:
     def apply(t: Type): Type = t match
-      case AnnotatedType(t1, ann) if variance >= 0 && ann.symbol == defn.SilentIntoAnnot =>
+      case AnnotatedType(t1, ann) if variance <= Vs.Covariant && ann.symbol == defn.SilentIntoAnnot =>
         AppliedType(
           defn.ConversionModule.termRef.select(defn.Conversion_into), // the external reference to the opaque type
           t1 :: Nil)

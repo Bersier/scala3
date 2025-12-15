@@ -3,24 +3,32 @@ package dotc
 package cc
 
 import core.*
-import Types.*, Symbols.*, Flags.*, Contexts.*, Decorators.*
+import Types.*
+import Symbols.*
+import Flags.*
+import Contexts.*
+import Decorators.*
 import config.Printers.{capt, captDebug}
 import Annotations.Annotation
+
 import annotation.threadUnsafe
 import annotation.constructorOnly
 import annotation.internal.sharable
 import reporting.trace
 import reporting.Message.Note
-import printing.{Showable, Printer}
+import printing.{Printer, Showable}
 import printing.Texts.*
-import util.{SimpleIdentitySet, Property, EqHashMap}
-import scala.collection.{mutable, immutable}
+import util.{EqHashMap, Property, SimpleIdentitySet}
+
+import scala.collection.{immutable, mutable}
 import CCState.*
 import TypeOps.AvoidMap
+
 import compiletime.uninitialized
 import Capabilities.*
 import Names.Name
 import NameKinds.CapsetName
+import dotty.tools.dotc.core.Variances.Vs
 
 /** A class for capture sets. Capture sets can be constants or variables.
  *  Capture sets support inclusion constraints <:< where <:< is subcapturing.
@@ -1293,13 +1301,13 @@ object CaptureSet:
    *        - if the variance is contravariant, return {}
    *        - Otherwise assertion failure
    */
-  final def mappedSet(r: Capability, tm: TypeMap, variance: Int)(using Context): CaptureSet =
+  final def mappedSet(r: Capability, tm: TypeMap, variance: Vs.Variance)(using Context): CaptureSet =
     tm.mapCapability(r) match
       case c: CoreCapability => c.captureSet
       case c: Capability => c.singletonCaptureSet
       case (cs: CaptureSet, exact) =>
-        if cs.isAlwaysEmpty || exact || variance > 0 then cs
-        else if variance < 0 then CaptureSet.EmptyWithProvenance(r, cs)
+        if cs.isAlwaysEmpty || exact || variance >= Vs.Covariant then cs
+        else if variance >= Vs.Contravariant then CaptureSet.EmptyWithProvenance(r, cs)
         else cs.maybe
 
   /** Apply `f` to each element in `xs`, and join result sets with `++` */
@@ -1307,7 +1315,7 @@ object CaptureSet:
     ((empty: CaptureSet) /: xs)((cs, x) => cs ++ f(x))
 
   /** Apply extrapolated `tm` to each element in `xs`, and join result sets with `++` */
-  def mapRefs(xs: Refs, tm: TypeMap, variance: Int)(using Context): CaptureSet =
+  def mapRefs(xs: Refs, tm: TypeMap, variance: Vs.Variance)(using Context): CaptureSet =
     mapRefs(xs, mappedSet(_, tm, variance))
 
   /** Return true iff

@@ -2,19 +2,26 @@ package dotty.tools
 package dotc
 package cc
 import ast.tpd
-import collection.mutable
 
+import collection.mutable
 import core.*
-import Symbols.*, Types.*, Flags.*, Contexts.*, Names.*, Decorators.*
-import CaptureSet.{Refs, emptyRefs, HiddenSet}
+import Symbols.*
+import Types.*
+import Flags.*
+import Contexts.*
+import Names.*
+import Decorators.*
+import CaptureSet.{HiddenSet, Refs, emptyRefs}
 import NameKinds.WildcardParamName
 import config.Printers.capt
 import StdNames.nme
-import util.{SimpleIdentitySet, EqHashMap, SrcPos}
+import util.{EqHashMap, SimpleIdentitySet, SrcPos}
 import tpd.*
+
 import reflect.ClassTag
 import reporting.trace
 import Capabilities.*
+import dotty.tools.dotc.core.Variances.Vs
 
 /** The separation checker is  a tree traverser that is run after capture checking.
  *  It checks tree nodes for various separation conditions, explained in the
@@ -811,7 +818,7 @@ class SepCheck(checker: CheckCaptures.CheckerAPI) extends tpd.TreeTraverser:
       private val seen = util.HashSet[Symbol]()
 
       def apply(c: Captures, t: Type) =
-        if variance < 0 then c
+        if variance >= Vs.Contravariant then c
         else
           val t1 = t.dealias
           t1 match

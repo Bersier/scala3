@@ -3,34 +3,45 @@ package dotc
 package cc
 
 import core.*
-import Phases.*, DenotTransformers.*, SymDenotations.*
-import Contexts.*, Names.*, Flags.*, Symbols.*, Decorators.*
-import Types.*, StdNames.*, Denotations.*
-import config.Printers.{capt, recheckr, noPrinter}
+import Phases.*
+import DenotTransformers.*
+import SymDenotations.*
+import Contexts.*
+import Names.*
+import Flags.*
+import Symbols.*
+import Decorators.*
+import Types.*
+import StdNames.*
+import Denotations.*
+import config.Printers.{capt, noPrinter, recheckr}
 import config.{Config, Feature}
-import ast.{tpd, untpd, Trees}
+import ast.{Trees, tpd, untpd}
 import Trees.*
 import typer.ForceDegree
 import typer.Inferencing.isFullyDefined
-import typer.RefChecks.{checkAllOverrides, checkSelfAgainstParents, OverridingPairsChecker}
-import typer.Checking.{checkBounds, checkAppliedTypesIn}
+import typer.RefChecks.{OverridingPairsChecker, checkAllOverrides, checkSelfAgainstParents}
+import typer.Checking.{checkAppliedTypesIn, checkBounds}
 import typer.ErrorReporting.err
-import typer.ProtoTypes.{LhsProto, WildcardSelectionProto, SelectionProto}
-import util.{SimpleIdentitySet, EqHashMap, EqHashSet, SrcPos, Property}
+import typer.ProtoTypes.{LhsProto, SelectionProto, WildcardSelectionProto}
+import util.{EqHashMap, EqHashSet, Property, SimpleIdentitySet, SrcPos}
 import util.chaining.tap
-import transform.{Recheck, PreRecheck, CapturedVars}
+import transform.{CapturedVars, PreRecheck, Recheck}
 import Recheck.*
+
 import scala.collection.mutable
-import CaptureSet.{withCaptureSetsExplained, IncludeFailure, MutAdaptFailure, VarState}
+import CaptureSet.{IncludeFailure, MutAdaptFailure, VarState, withCaptureSetsExplained}
 import CCState.*
 import StdNames.nme
-import NameKinds.{DefaultGetterName, WildcardParamName, UniqueNameKind}
-import reporting.{trace, Message, OverrideError}
+import NameKinds.{DefaultGetterName, UniqueNameKind, WildcardParamName}
+import reporting.{Message, OverrideError, trace}
 import reporting.Message.Note
 import Annotations.Annotation
 import Capabilities.*
 import Mutability.*
+import dotty.tools.dotc.core.Variances.Vs
 import util.common.alwaysTrue
+
 import scala.annotation.constructorOnly
 
 /** The capture checker */
@@ -161,7 +172,7 @@ object CheckCaptures:
           case AnnotatedType(_, ann) if ann.symbol == defn.UncheckedCapturesAnnot =>
             ()
           case CapturingType(parent, refs) =>
-            if variance >= 0 then
+            if variance >= Vs.Covariant then
               val openScopes = openExistentialScopes
               refs.disallowBadRoots(upto): () =>
                 def part =
@@ -182,7 +193,7 @@ object CheckCaptures:
           case defn.RefinedFunctionOf(mt) =>
             traverse(mt)
           case t: MethodType if t.marksExistentialScope =>
-            atVariance(-variance):
+            atVariance(variance.flip):
               t.paramInfos.foreach(traverse)
             val saved = openExistentialScopes
             openExistentialScopes = t :: openExistentialScopes
@@ -330,17 +341,17 @@ class CheckCaptures extends Recheck, SymTransformer:
     /** Instantiate capture set variables appearing contra-variantly to their
      *  upper approximation.
      */
-    private def interpolate(tp: Type, sym: Symbol, startingVariance: Int = 1)(using Context): Unit =
+    private def interpolate(tp: Type, sym: Symbol, startingVariance: Vs.Variance = Vs.Covariant)(using Context): Unit =
 
       object variances extends TypeTraverser:
         variance = startingVariance
-        val varianceOfVar = EqHashMap[CaptureSet.Var, Int]()
+        val varianceOfVar = EqHashMap[CaptureSet.Var, Vs.Variance]()
         override def traverse(t: Type) = t match
           case t @ CapturingType(parent, refs) =>
             refs match
               case refs: CaptureSet.Var if !refs.isConst =>
                 varianceOfVar(refs) = varianceOfVar.get(refs) match
-                  case Some(v0) => if v0 == 0 then 0 else (v0 + variance) / 2
+                  case Some(v0) => v0 & variance
                   case None => variance
               case _ =>
             traverse(parent)
@@ -372,7 +383,7 @@ class CheckCaptures extends Recheck, SymTransformer:
      */
     private def anchorCaps(sym: Symbol)(using Context) = new TypeTraverser:
       override def traverse(t: Type) =
-        if variance > 0 then
+        if variance >= Vs.Covariant then
           t match
             case t @ CapturingType(parent, refs) =>
               for ref <- refs.elems do

@@ -4,16 +4,16 @@ package typer
 
 import backend.sjs.JSDefinitions
 import core.*
-import ast.{TreeTypeMap, untpd, tpd}
+import ast.{TreeTypeMap, tpd, untpd}
 import util.Spans.*
-import util.Stats.{record, monitored}
-import printing.{Showable, Printer}
+import util.Stats.{monitored, record}
+import printing.{Printer, Showable}
 import printing.Texts.*
 import Contexts.*
 import Types.*
 import Flags.*
 import Mode.ImplicitsEnabled
-import NameKinds.{LazyImplicitName, ContextBoundParamName}
+import NameKinds.{ContextBoundParamName, LazyImplicitName}
 import Symbols.*
 import Types.*
 import Decorators.*
@@ -23,18 +23,21 @@ import ProtoTypes.*
 import ErrorReporting.*
 import Inferencing.{fullyDefinedType, isFullyDefined}
 import Scopes.newScope
-import Typer.BindingPrec, BindingPrec.*
+import Typer.BindingPrec
+import BindingPrec.*
 import Hashable.*
 import util.{EqHashMap, Stats}
 import config.{Config, Feature, SourceVersion}
 import Feature.{migrateTo3, sourceVersion}
 import config.Printers.{implicits, implicitsDetailed}
+
 import collection.mutable
 import reporting.*
 import Message.Note
+import dotty.tools.dotc.core.Variances.Vs
 import transform.Splicer
-import annotation.tailrec
 
+import annotation.tailrec
 import scala.annotation.internal.sharable
 import scala.annotation.threadUnsafe
 import scala.compiletime.uninitialized
@@ -1065,7 +1068,7 @@ trait Implicits:
         case t: LazyRef =>
           t
         case _ =>
-          if (variance > 0) mapOver(t) else t
+          if (variance >= Vs.Covariant) mapOver(t) else t
       }
     }
 

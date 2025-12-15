@@ -13,6 +13,7 @@ import Names.*
 import StdNames.nme
 import Flags.{Module, Provisional}
 import dotty.tools.dotc.config.Config
+import dotty.tools.dotc.core.Variances.Vs
 
 object TypeApplications {
 
@@ -143,7 +144,7 @@ object TypeApplications {
         args(p.paramNum) match {
           case TypeBounds(lo, hi) =>
             if (ctx.mode.is(Mode.AllowLambdaWildcardApply)) { allReplaced = false; p }
-            else if (variance < 0) lo
+            else if (variance == Vs.Contravariant) lo
             else hi
           case arg =>
             arg

@@ -32,8 +32,8 @@ object VarianceChecker {
     def checkType(tpe: Type): Unit = tpe match
       case tl: HKTypeLambda if tl.isDeclaredVarianceLambda =>
         val checkOK = new TypeAccumulator[Boolean] {
-          def paramVarianceSign(tref: TypeParamRef) =
-            tl.typeParams(tref.paramNum).oldParamVarianceSign
+          def paramVarianceSign(tref: TypeParamRef): Vs.Variance =
+            tl.typeParams(tref.paramNum).paramVarianceSign
           def error(tref: TypeParamRef) = {
             val paramName = tl.paramNames(tref.paramNum).toTermName
             val v = paramVarianceSign(tref)
@@ -41,12 +41,12 @@ object VarianceChecker {
               .find(_.name.toTermName == paramName)
               .map(_.srcPos)
               .getOrElse(tree.srcPos)
-            report.error(em"${varianceLabel(v)} type parameter $paramName occurs in ${varianceLabel(variance)} position in ${tl.resType}", pos)
+            report.error(em"${v.label} type parameter $paramName occurs in ${variance.label} position in ${tl.resType}", pos)
           }
           def apply(x: Boolean, t: Type) = x && {
             t match {
               case tref: TypeParamRef if tref.binder `eq` tl =>
-                varianceConforms(variance, paramVarianceSign(tref))
+                variance <= paramVarianceSign(tref)
                 || { error(tref); false }
               case AnnotatedType(_, annot) if annot.symbol == defn.UncheckedVarianceAnnot =>
                 x
@@ -104,7 +104,7 @@ class VarianceChecker(using Context) {
       val relative = relativeVariance(tvar, base)
       if (relative == BivariantFlagSet) None
       else {
-        val required = if variance == 1 then relative else if variance == -1 then flip(relative) else InvariantFlagSet
+        val required = variance.flip.asFlagSet
         def tvar_s = s"$tvar (${varianceLabel(tvar.flags)} ${tvar.showLocated})"
         def base_s = s"$base in ${base.owner}" + (if (base.owner.isClass) "" else " in " + base.owner.enclosingClass)
         report.log(s"verifying $tvar_s is ${varianceLabel(required)} at $base_s")
@@ -159,7 +159,7 @@ class VarianceChecker(using Context) {
         || base.is(Private) && !base.hasAnnotation(defn.AssignedNonLocallyAnnot)
       if base.isMutableVar && !isLocal then
         base.removeAnnotation(defn.AssignedNonLocallyAnnot)
-        variance = 0
+        variance = Vs.Invariant
       try checkInfo(base.info)
       finally
         this.base = savedBase

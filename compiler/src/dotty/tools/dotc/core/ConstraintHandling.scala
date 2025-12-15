@@ -14,6 +14,7 @@ import UnificationDirection.*
 import NameKinds.AvoidNameKind
 import util.SimpleIdentitySet
 import NullOpsDecorator.stripNull
+import dotty.tools.dotc.core.Variances.Vs
 
 /** Methods for adding constraints and solving them.
  *
@@ -197,7 +198,7 @@ trait ConstraintHandling {
   /** An approximating map that prevents types nested deeper than maxLevel as
    *  well as WildcardTypes from leaking into the constraint.
    */
-  class LevelAvoidMap(topLevelVariance: Int, maxLevel: Int)(using Context) extends TypeOps.AvoidMap:
+  class LevelAvoidMap(topLevelVariance: Vs.Variance, maxLevel: Int)(using Context) extends TypeOps.AvoidMap:
     variance = topLevelVariance
 
     def toAvoid(tp: NamedType): Boolean =
@@ -210,10 +211,11 @@ trait ConstraintHandling {
      */
     def legalVar(tp: TypeVar): Type =
       val oldParam = tp.origin
-      val nameKind =
-        if variance > 0 then AvoidNameKind.UpperBound
-        else if variance < 0 then AvoidNameKind.LowerBound
-        else AvoidNameKind.BothBounds
+      val nameKind = variance match
+        case Vs.Covariant => AvoidNameKind.UpperBound
+        case Vs.Contravariant => AvoidNameKind.LowerBound
+        case Vs.Invariant => AvoidNameKind.BothBounds
+        case Vs.Bivariant => AvoidNameKind.NeitherBound
 
       /** If it exists, return the first param in the list created in a previous call to `legalVar(tp)`
        *  with the appropriate level and variance.
@@ -222,7 +224,7 @@ trait ConstraintHandling {
         params.find(p =>
           nestingLevel(p) <= maxLevel && representedParamRef(p) == oldParam &&
           (p.paramName.is(AvoidNameKind.BothBounds) ||
-           variance != 0 && p.paramName.is(nameKind)))
+           variance != Vs.Invariant && p.paramName.is(nameKind)))
 
       // First, check if we can reuse an existing parameter, this is more than an optimization
       // since it avoids an infinite loop in tests/pos/i8900-cycle.scala
@@ -235,13 +237,11 @@ trait ConstraintHandling {
           val name = nameKind(oldParam.paramName.toTermName).toTypeName
           val freshVar = newTypeVar(TypeBounds.upper(tp.topType), name,
             nestingLevel = maxLevel, represents = oldParam)
-          val ok =
-            if variance < 0 then
-              addLess(freshVar.origin, oldParam)
-            else if variance > 0 then
-              addLess(oldParam, freshVar.origin)
-            else
-              unify(freshVar.origin, oldParam)
+          val ok = variance match
+            case Vs.Contravariant => addLess(freshVar.origin, oldParam)
+            case Vs.Covariant => addLess(oldParam, freshVar.origin)
+            case Vs.Invariant => unify(freshVar.origin, oldParam)
+            case Vs.Bivariant => true
           if ok then freshVar else emptyRange
     end legalVar
 
@@ -289,7 +289,7 @@ trait ConstraintHandling {
         // type variable doesn't reduce the set of possible solutions.
         // Therefore, we can safely "unflip" the variance flipped above.
         // This is necessary for i8900-unflip.scala to typecheck.
-        val v = if necessaryConstraintsOnly then -this.variance else this.variance
+        val v = if necessaryConstraintsOnly then this.variance.flip else this.variance
         atVariance(v)(super.legalVar(tp))
     constraint.validBoundFor(param, approx(rawBound), isUpper)
   end legalBound
@@ -523,7 +523,7 @@ trait ConstraintHandling {
      *  to be instantiated.
      */
     def needsLeveling = new TypeAccumulator[Boolean]:
-      if !fromBelow then variance = -1
+      if !fromBelow then variance = Vs.Contravariant
 
       def apply(need: Boolean, tp: Type) =
         need || tp.match
@@ -551,7 +551,7 @@ trait ConstraintHandling {
     end needsLeveling
 
     def levelAvoid = new TypeOps.AvoidMap:
-      if !fromBelow then variance = -1
+      if !fromBelow then variance = Vs.Contravariant
       def toAvoid(tp: NamedType) = needsFix(tp)
 
     if Config.checkLevelsOnInstantiation && !ctx.isAfterTyper && needsLeveling(false, tp) then
@@ -843,7 +843,7 @@ trait ConstraintHandling {
     def avoidLambdaParams(tp: Type) =
       if comparedTypeLambdas.nonEmpty then
         val approx = new ApproximatingTypeMap {
-          if (!fromBelow) variance = -1
+          if (!fromBelow) variance = Vs.Contravariant
           def apply(t: Type): Type = t match {
             case t @ TypeParamRef(tl: TypeLambda, n) if comparedTypeLambdas.contains(tl) =>
               val bounds = tl.paramInfos(n)
